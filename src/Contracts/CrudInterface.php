@@ -1,0 +1,89 @@
+<?php namespace Limoncello\JsonApi\Contracts;
+
+/**
+ * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+use Limoncello\JsonApi\Contracts\Document\ResourceInterface;
+use Limoncello\Models\Contracts\PaginatedDataInterface;
+
+/**
+ * @package Limoncello\JsonApi
+ */
+interface CrudInterface
+{
+    /**
+     * @param array|null $filterParams
+     * @param array|null $sortParams
+     * @param array|null $includePaths
+     * @param array|null $pagingParams
+     *
+     * @return ModelsDataInterface
+     */
+    public function index(
+        array $filterParams = null,
+        array $sortParams = null,
+        array $includePaths = null,
+        array $pagingParams = null
+    );
+
+    /**
+     * @param int|string $index
+     * @param array|null $filterParams
+     * @param array|null $includePaths
+     *
+     * @return ModelsDataInterface
+     */
+    public function read($index, array $filterParams = null, array $includePaths = null);
+
+    /**
+     * @param int|string $index
+     *
+     * @return void
+     */
+    public function delete($index);
+
+    /**
+     * @param ResourceInterface $resource
+     *
+     * @return string
+     */
+    public function create(ResourceInterface $resource);
+
+    /**
+     * @param int|string        $index
+     * @param ResourceInterface $resource
+     *
+     * @return void
+     */
+    public function update($index, ResourceInterface $resource);
+
+    /**
+     * @param int|string $index
+     * @param string     $relationshipName
+     * @param array|null $filterParams
+     * @param array|null $sortParams
+     * @param array|null $pagingParams
+     *
+     * @return PaginatedDataInterface
+     */
+    public function readRelationship(
+        $index,
+        $relationshipName,
+        array $filterParams = null,
+        array $sortParams = null,
+        array $pagingParams = null
+    );
+}
