@@ -68,6 +68,8 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
         /** @var SchemaInterface $schemaClassName */
         $this->schemaType = $schemaClassName::TYPE;
         $this->mappings   = $schemaClassName::getMappings();
+
+        $this->setSchema(static::SCHEMA_CLASS);
     }
 
     /**
