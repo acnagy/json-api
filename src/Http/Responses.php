@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
+use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
-use Limoncello\JsonApi\Contracts\ModelsDataInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
 use Neomerx\JsonApi\Contracts\Http\Headers\MediaTypeInterface;

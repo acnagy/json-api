@@ -16,40 +16,30 @@
  * limitations under the License.
  */
 
-use Limoncello\Tests\JsonApi\Data\Models\Board;
-use Limoncello\Tests\JsonApi\Data\Models\Post;
-use Limoncello\Tests\JsonApi\Data\Models\User;
-use PDO;
+use Limoncello\Tests\JsonApi\Data\Models\Post as Model;
 
 /**
  * @package Limoncello\Tests\JsonApi
  */
 class PostsMigration extends Migration
 {
-    /**
-     * @inheritdoc
-     */
-    public function migrate(PDO $pdo)
-    {
-        $this->createTable($pdo, Post::TABLE_NAME, [
-            $this->primaryInt(Post::FIELD_ID),
-            $this->int(Post::FIELD_ID_USER),
-            $this->int(Post::FIELD_ID_BOARD),
-            $this->text(Post::FIELD_TITLE),
-            $this->text(Post::FIELD_TEXT),
-            $this->date(Post::FIELD_CREATED_AT),
-            $this->date(Post::FIELD_UPDATED_AT),
-            $this->date(Post::FIELD_DELETED_AT),
-            $this->foreignKey(Post::FIELD_ID_BOARD, Board::TABLE_NAME, Board::FIELD_ID),
-            $this->foreignKey(Post::FIELD_ID_USER, User::TABLE_NAME, User::FIELD_ID),
-        ]);
-    }
+    /** @inheritdoc */
+    const MODEL_CLASS = Model::class;
 
     /**
      * @inheritdoc
      */
-    public function rollback(PDO $pdo)
+    public function migrate()
     {
-        $this->dropTable($pdo, Post::TABLE_NAME);
+        $this->createTable(Model::TABLE_NAME, [
+            $this->primaryInt(Model::FIELD_ID),
+            $this->relationship(Model::REL_USER),
+            $this->relationship(Model::REL_BOARD),
+            $this->string(Model::FIELD_TITLE),
+            $this->text(Model::FIELD_TEXT),
+            $this->datetime(Model::FIELD_CREATED_AT),
+            $this->nullableDatetime(Model::FIELD_UPDATED_AT),
+            $this->nullableDatetime(Model::FIELD_DELETED_AT),
+        ]);
     }
 }

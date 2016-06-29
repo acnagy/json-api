@@ -16,43 +16,37 @@
  * limitations under the License.
  */
 
-use Limoncello\Tests\JsonApi\Data\Models\Role;
-use Limoncello\Tests\JsonApi\Data\Models\User;
-use PDO;
+use Limoncello\Tests\JsonApi\Data\Models\User as Model;
 
 /**
  * @package Limoncello\Tests\JsonApi
  */
 class UsersMigration extends Migration
 {
-    /**
-     * @inheritdoc
-     */
-    public function migrate(PDO $pdo)
-    {
-        $this->createTable($pdo, User::TABLE_NAME, [
-            $this->primaryInt(User::FIELD_ID),
-            $this->int(User::FIELD_ID_ROLE),
-            $this->text(User::FIELD_TITLE),
-            $this->text(User::FIELD_FIRST_NAME),
-            $this->text(User::FIELD_LAST_NAME),
-            $this->text(User::FIELD_LANGUAGE),
-            $this->text(User::FIELD_EMAIL),
-            $this->bool(User::FIELD_IS_ACTIVE),
-            $this->text(User::FIELD_PASSWORD_HASH),
-            $this->text(User::FIELD_API_TOKEN),
-            $this->date(User::FIELD_CREATED_AT),
-            $this->date(User::FIELD_UPDATED_AT),
-            $this->date(User::FIELD_DELETED_AT),
-            $this->foreignKey(User::FIELD_ID_ROLE, Role::TABLE_NAME, Role::FIELD_ID),
-        ]);
-    }
+    /** @inheritdoc */
+    const MODEL_CLASS = Model::class;
 
     /**
      * @inheritdoc
      */
-    public function rollback(PDO $pdo)
+    public function migrate()
     {
-        $this->dropTable($pdo, User::TABLE_NAME);
+        $this->createTable(Model::TABLE_NAME, [
+            $this->primaryInt(Model::FIELD_ID),
+            $this->relationship(Model::REL_ROLE),
+            $this->string(Model::FIELD_TITLE),
+            $this->string(Model::FIELD_FIRST_NAME),
+            $this->string(Model::FIELD_LAST_NAME),
+            $this->string(Model::FIELD_LANGUAGE),
+            $this->string(Model::FIELD_EMAIL),
+            $this->string(Model::FIELD_PASSWORD_HASH),
+            $this->string(Model::FIELD_API_TOKEN),
+            $this->bool(Model::FIELD_IS_ACTIVE),
+            $this->datetime(Model::FIELD_CREATED_AT),
+            $this->nullableDatetime(Model::FIELD_UPDATED_AT),
+            $this->nullableDatetime(Model::FIELD_DELETED_AT),
+
+            $this->unique([Model::FIELD_EMAIL]),
+        ]);
     }
 }

@@ -77,6 +77,8 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
 
     /** @noinspection PhpMissingParentCallCommonInspection
      * @inheritdoc
+     *
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function getRelationships($model, $isPrimary, array $includeRelationships)
     {

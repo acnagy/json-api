@@ -17,37 +17,31 @@
  */
 
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
-use Limoncello\Tests\JsonApi\Data\Models\CommentEmotion;
+use Limoncello\Tests\JsonApi\Data\Models\CommentEmotion as Model;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
-use PDO;
 
 /**
  * @package Limoncello\Tests\JsonApi
  */
 class CommentEmotionsMigration extends Migration
 {
-    /**
-     * @inheritdoc
-     */
-    public function migrate(PDO $pdo)
-    {
-        $this->createTable($pdo, CommentEmotion::TABLE_NAME, [
-            $this->primaryInt(CommentEmotion::FIELD_ID),
-            $this->int(CommentEmotion::FIELD_ID_COMMENT),
-            $this->int(CommentEmotion::FIELD_ID_EMOTION),
-            $this->date(CommentEmotion::FIELD_CREATED_AT),
-            $this->date(CommentEmotion::FIELD_UPDATED_AT),
-            $this->date(CommentEmotion::FIELD_DELETED_AT),
-            $this->foreignKey(CommentEmotion::FIELD_ID_COMMENT, Comment::TABLE_NAME, Comment::FIELD_ID),
-            $this->foreignKey(CommentEmotion::FIELD_ID_EMOTION, Emotion::TABLE_NAME, Emotion::FIELD_ID),
-        ]);
-    }
+    /** @inheritdoc */
+    const MODEL_CLASS = Model::class;
 
     /**
      * @inheritdoc
      */
-    public function rollback(PDO $pdo)
+    public function migrate()
     {
-        $this->dropTable($pdo, CommentEmotion::TABLE_NAME);
+        $this->createTable(Model::TABLE_NAME, [
+            $this->primaryInt(Model::FIELD_ID),
+            $this->foreignInt(Model::FIELD_ID_COMMENT, Comment::class),
+            $this->foreignInt(Model::FIELD_ID_EMOTION, Emotion::class),
+            $this->datetime(Model::FIELD_CREATED_AT),
+            $this->nullableDatetime(Model::FIELD_UPDATED_AT),
+            $this->nullableDatetime(Model::FIELD_DELETED_AT),
+
+            $this->unique([Model::FIELD_ID_COMMENT, Model::FIELD_ID_EMOTION]),
+        ]);
     }
 }

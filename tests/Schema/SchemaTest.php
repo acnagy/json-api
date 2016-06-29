@@ -16,9 +16,9 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\ModelsDataInterface;
+use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Tests\JsonApi\CrudTest;
+use Limoncello\Tests\JsonApi\Api\CrudTest;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
 use Limoncello\Tests\JsonApi\TestCase;

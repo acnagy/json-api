@@ -160,8 +160,6 @@ class JsonApiConfig implements JsonApiConfigInterface
                 self::KEY_JSON_VERSION_META             => $this->meta,
                 self::KEY_JSON_URL_PREFIX               => $this->uriPrefix,
             ],
-
-            self::KEY_EXECUTE_DB_QUERIES_ONE_BY_ONE => true,
         ];
     }
 }

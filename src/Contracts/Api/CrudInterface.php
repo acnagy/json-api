@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Contracts;
+<?php namespace Limoncello\JsonApi\Contracts\Api;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)

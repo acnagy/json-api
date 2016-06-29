@@ -18,8 +18,8 @@
 
 use Closure;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
+use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
-use Limoncello\JsonApi\Contracts\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;

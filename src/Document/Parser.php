@@ -27,6 +27,8 @@ use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  */
 class Parser implements ParserInterface
 {
@@ -119,26 +121,31 @@ class Parser implements ParserInterface
     {
         $result = null;
 
-        $dataSegment = $this->getArrayValue($data, DocumentInterface::KEYWORD_DATA, null);
+        $this->getTransformer()->transformationsToStart();
+        try {
+            $dataSegment = $this->getArrayValue($data, DocumentInterface::KEYWORD_DATA, null);
 
-        if (empty($dataSegment) === true || is_array($dataSegment) === false) {
-            $this->getErrors()->addDataError($this->translator->get(T::MSG_ERR_INVALID_ELEMENT));
+            if (empty($dataSegment) === true || is_array($dataSegment) === false) {
+                $this->getErrors()->addDataError($this->translator->get(T::MSG_ERR_INVALID_ELEMENT));
 
-            return $result;
-        }
+                return $result;
+            }
 
-        $hasError = false;
-        if ($this->hasType($dataSegment) === false) {
-            $this->getErrors()->addDataTypeError($this->translator->get(T::MSG_ERR_INVALID_ELEMENT));
-            $hasError = true;
-        }
-        if ($this->hasId($dataSegment) === false) {
-            $this->getErrors()->addDataIdError($this->translator->get(T::MSG_ERR_INVALID_ELEMENT));
-            $hasError = true;
-        }
+            $hasError = false;
+            if ($this->hasType($dataSegment) === false) {
+                $this->getErrors()->addDataTypeError($this->translator->get(T::MSG_ERR_INVALID_ELEMENT));
+                $hasError = true;
+            }
+            if ($this->hasId($dataSegment) === false) {
+                $this->getErrors()->addDataIdError($this->translator->get(T::MSG_ERR_INVALID_ELEMENT));
+                $hasError = true;
+            }
 
-        if ($hasError === false) {
-            $result = $this->parseSinglePrimaryData($dataSegment);
+            if ($hasError === false) {
+                $result = $this->parseSinglePrimaryData($dataSegment);
+            }
+        } finally {
+            $this->getTransformer()->transformationsFinished($this->getErrors());
         }
 
         return $result;
@@ -184,6 +191,8 @@ class Parser implements ParserInterface
      * @param array $data
      *
      * @return ResourceInterface|null
+     *
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     private function parseSinglePrimaryData(array $data)
     {
@@ -228,6 +237,9 @@ class Parser implements ParserInterface
      * @param array $data
      *
      * @return array
+     *
+     * @SuppressWarnings(PHPMD.ElseExpression)
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     private function parseRelationships(array $data)
     {

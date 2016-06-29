@@ -16,8 +16,15 @@
  * limitations under the License.
  */
 
+use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Query\QueryBuilder;
+use Doctrine\DBAL\Schema\Table;
+use Doctrine\DBAL\Types\Type;
 use Limoncello\JsonApi\Adapters\FilterOperations;
+use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
+use Limoncello\JsonApi\I18n\Translator;
 use Limoncello\Tests\JsonApi\TestCase;
+use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
  * @package Limoncello\Tests\JsonApi
@@ -25,73 +32,187 @@ use Limoncello\Tests\JsonApi\TestCase;
 class FilterOperationsTest extends TestCase
 {
     /**
-     * Test parse.
+     * @var QueryBuilder
      */
-    public function testRegisterUnregister()
+    private $builder;
+
+    /**
+     * @var FilterOperationsInterface
+     */
+    private $filters;
+
+    /**
+     * @inheritdoc
+     */
+    protected function setUp()
     {
-        $ops = new FilterOperations();
+        parent::setUp();
 
-        $this->assertFalse($ops->hasOperation('xyz'));
+        $connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:']);
 
-        $ops->register('xyz', function () {
-            // doesn't matter for this test
-        });
+        $this->builder = $connection->createQueryBuilder();
+        $this->filters = new FilterOperations(new Translator());
 
-        $this->assertTrue($ops->hasOperation('xyz'));
+        $schemaManager = $connection->getSchemaManager();
+        $table         = new Table('table_name');
+        $table->addColumn('column_name', Type::TEXT);
+        $schemaManager->createTable($table);
 
-        $ops->unregister('xyz');
-
-        $this->assertFalse($ops->hasOperation('xyz'));
+        $connection->insert('table_name', ['column_name' => 'value']);
+        $connection->insert('table_name', ['column_name' => 'value1']);
+        $connection->insert('table_name', ['column_name' => 'value2']);
     }
 
     /**
-     * Test operations.
+     * Test apply condition.
      */
-    public function testOperations()
+    public function testApplySingleCondition()
     {
-        $table  = 't';
-        $column = 'c';
+        $link   = $this->builder->expr()->andX();
+        $errors = new ErrorCollection();
 
-        $input = [
-            [FilterOperations::EQ, ['value'], [[$table, $column, '=', 'value']]],
-            [FilterOperations::EQUALS, ['value'], [[$table, $column, '=', 'value']]],
-            [FilterOperations::NE, ['value'], [[$table, $column, '<>', 'value']]],
-            [FilterOperations::NOT_EQUALS, ['value'], [[$table, $column, '<>', 'value']]],
-            [FilterOperations::GT, ['value'], [[$table, $column, '>', 'value']]],
-            [FilterOperations::GREATER_THAN, ['value'], [[$table, $column, '>', 'value']]],
-            [FilterOperations::GE, ['value'], [[$table, $column, '>=', 'value']]],
-            [FilterOperations::GREATER_OR_EQUALS, ['value'], [[$table, $column, '>=', 'value']]],
-            [FilterOperations::LT, ['value'], [[$table, $column, '<', 'value']]],
-            [FilterOperations::LESS_THAN, ['value'], [[$table, $column, '<', 'value']]],
-            [FilterOperations::LE, ['value'], [[$table, $column, '<=', 'value']]],
-            [FilterOperations::LESS_OR_EQUALS, ['value'], [[$table, $column, '<=', 'value']]],
-            [FilterOperations::LIKE, ['value'], [[$table, $column, 'LIKE', 'value']]],
-            [FilterOperations::LIKE, ['value1', 'value2'], [
-                [$table, $column, 'LIKE', 'value1'],
-                [$table, $column, 'LIKE', 'value2'],
-            ]],
-            [FilterOperations::IN, ['value1', 'value2'], [[$table, $column, 'IN', ['value1', 'value2']]]],
-            [FilterOperations::EQ, [null], [[$table, $column, 'IS', null]]],
-            [FilterOperations::NE, [null], [[$table, $column, 'IS NOT', null]]],
-        ];
+        $this->filters->applyEquals($this->builder, $link, $errors, 'table_name', 'column_name', 'value');
+        $this->assertEquals(0, $errors->count());
 
-        $ops = new FilterOperations();
-        foreach ($input as list($operation, $arguments, $expected)) {
-            $operationsIterator = $ops->getOperations($operation, $table, $column, $arguments);
-            $operationsArray    = iterator_to_array($operationsIterator);
-            $this->assertEquals($expected, $operationsArray);
-        }
-    }
+        $this->builder->select('*')->from('table_name')->where($link);
 
-    /**
-     * Test default operation.
-     */
-    public function testDefaultOperation()
-    {
-        $ops = new FilterOperations();
         $this->assertEquals(
-            [['table', 'column', '=', 'value']],
-            iterator_to_array($ops->getDefaultOperation('table', 'column', ['value']))
+            'SELECT * FROM table_name WHERE `table_name`.`column_name` = :dcValue1',
+            $this->builder->getSQL()
         );
+        $this->assertEquals(['dcValue1' => 'value'], $this->builder->getParameters());
+
+        $this->assertEquals([
+            ['column_name' => 'value'],
+        ], $this->builder->execute()->fetchAll());
+    }
+
+    /**
+     * Test apply conditions.
+     */
+    public function testApplyMultiConditions()
+    {
+        $link   = $this->builder->expr()->orX();
+        $errors = new ErrorCollection();
+
+        $this->filters->applyEquals($this->builder, $link, $errors, 'table_name', 'column_name', ['value1', 'value2']);
+        $this->assertEquals(0, $errors->count());
+
+        $this->builder->select('*')->from('table_name')->where($link);
+
+        $this->assertEquals(
+            'SELECT * FROM table_name WHERE (`table_name`.`column_name` = :dcValue1) OR ' .
+            '(`table_name`.`column_name` = :dcValue2)',
+            $this->builder->getSQL()
+        );
+        $this->assertEquals(['dcValue1' => 'value1', 'dcValue2' => 'value2'], $this->builder->getParameters());
+
+        $this->assertEquals([
+            ['column_name' => 'value1'],
+            ['column_name' => 'value2'],
+        ], $this->builder->execute()->fetchAll());
+    }
+
+    /**
+     * Test apply conditions.
+     */
+    public function testApplyOtherOperations()
+    {
+        $link   = $this->builder->expr()->andX();
+        $errors = new ErrorCollection();
+
+        $this->filters->applyNotEquals($this->builder, $link, $errors, 'table_name', 'column_name', 'value1');
+        $this->filters->applyLessThan($this->builder, $link, $errors, 'table_name', 'column_name', 'value2');
+        $this->filters->applyLessOrEquals($this->builder, $link, $errors, 'table_name', 'column_name', 'value3');
+        $this->filters->applyGreaterThan($this->builder, $link, $errors, 'table_name', 'column_name', 'value4');
+        $this->filters->applyGreaterOrEquals($this->builder, $link, $errors, 'table_name', 'column_name', 'value5');
+        $this->filters->applyIsNull($this->builder, $link, 'table_name', 'column_name');
+        $this->filters->applyIsNotNull($this->builder, $link, 'table_name', 'column_name');
+        $this->filters->applyLike($this->builder, $link, $errors, 'table_name', 'column_name', 'value6');
+        $this->filters->applyNotLike($this->builder, $link, $errors, 'table_name', 'column_name', 'value7');
+        $this->filters->applyIn($this->builder, $link, $errors, 'table_name', 'column_name', ['value8']);
+        $this->filters->applyNotIn($this->builder, $link, $errors, 'table_name', 'column_name', ['value9', 'value10']);
+        $this->assertEquals(0, $errors->count());
+
+        $this->builder->select('*')->from('table_name')->where($link);
+
+        $expected = 'SELECT * FROM table_name WHERE ' .
+            '(`table_name`.`column_name` <> :dcValue1) AND ' .
+            '(`table_name`.`column_name` < :dcValue2) AND ' .
+            '(`table_name`.`column_name` <= :dcValue3) AND ' .
+            '(`table_name`.`column_name` > :dcValue4) AND ' .
+            '(`table_name`.`column_name` >= :dcValue5) AND ' .
+            '(`table_name`.`column_name` IS NULL) AND ' .
+            '(`table_name`.`column_name` IS NOT NULL) AND ' .
+            '(`table_name`.`column_name` LIKE :dcValue6) AND ' .
+            '(`table_name`.`column_name` NOT LIKE :dcValue7) AND ' .
+            '(`table_name`.`column_name` IN (:dcValue8)) AND ' .
+            '(`table_name`.`column_name` NOT IN (:dcValue9, :dcValue10))';
+
+        $this->assertEquals($expected, $this->builder->getSQL());
+        $this->assertEquals([
+            'dcValue1'  => 'value1',
+            'dcValue2'  => 'value2',
+            'dcValue3'  => 'value3',
+            'dcValue4'  => 'value4',
+            'dcValue5'  => 'value5',
+            'dcValue6'  => 'value6',
+            'dcValue7'  => 'value7',
+            'dcValue8'  => 'value8',
+            'dcValue9'  => 'value9',
+            'dcValue10' => 'value10',
+        ], $this->builder->getParameters());
+    }
+
+    /**
+     * Test invalid input.
+     */
+    public function testInvalidInput1()
+    {
+        $link   = $this->builder->expr()->andX();
+        $errors = new ErrorCollection();
+
+        $this->filters->applyEquals($this->builder, $link, $errors, 'table_name', 'column_name', [['value']]);
+        $this->assertEquals(1, $errors->count());
+        $this->assertEquals(['parameter' => 'column_name'], $errors[0]->getSource());
+    }
+
+    /**
+     * Test invalid input.
+     */
+    public function testInvalidInput2()
+    {
+        $link   = $this->builder->expr()->andX();
+        $errors = new ErrorCollection();
+
+        $this->filters->applyEquals($this->builder, $link, $errors, 'table_name', 'column_name', new self);
+        $this->assertEquals(1, $errors->count());
+        $this->assertEquals(['parameter' => 'column_name'], $errors[0]->getSource());
+    }
+
+    /**
+     * Test invalid input.
+     */
+    public function testInvalidInput3()
+    {
+        $link   = $this->builder->expr()->andX();
+        $errors = new ErrorCollection();
+
+        $this->filters->applyIn($this->builder, $link, $errors, 'table_name', 'column_name', [['value']]);
+        $this->assertEquals(1, $errors->count());
+        $this->assertEquals(['parameter' => 'column_name'], $errors[0]->getSource());
+    }
+
+    /**
+     * Test invalid input.
+     */
+    public function testInvalidInput4()
+    {
+        $link   = $this->builder->expr()->andX();
+        $errors = new ErrorCollection();
+
+        $this->filters->applyNotIn($this->builder, $link, $errors, 'table_name', 'column_name', [new self]);
+        $this->assertEquals(1, $errors->count());
+        $this->assertEquals(['parameter' => 'column_name'], $errors[0]->getSource());
     }
 }

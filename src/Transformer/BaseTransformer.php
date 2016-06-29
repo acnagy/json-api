@@ -26,6 +26,9 @@ use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
  */
 abstract class BaseTransformer
 {
+    /** JSON API Error status code */
+    const ERROR_STATUS_CODE = 422;
+
     /**
      * @var string
      */

@@ -86,6 +86,20 @@ abstract class BaseTransformer implements TransformerInterface
     /**
      * @inheritdoc
      */
+    public function transformationsToStart()
+    {
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function transformationsFinished(ErrorCollection $errors)
+    {
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function isValidType($type)
     {
         return $this->getSchemaType() === $type;

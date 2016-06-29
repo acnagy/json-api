@@ -16,9 +16,12 @@
  * limitations under the License.
  */
 
+use Doctrine\DBAL\Connection;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
+use Limoncello\JsonApi\Contracts\Api\CrudInterface;
+use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Document\ParserInterface;
 use Limoncello\JsonApi\Contracts\Document\ResourceIdentifierInterface;
 use Limoncello\JsonApi\Contracts\Document\ResourceInterface;
@@ -34,7 +37,6 @@ use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Models\Contracts\TagStorageInterface;
 use Neomerx\JsonApi\Encoder\EncoderOptions;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
-use PDO;
 
 /**
  * @package Limoncello\JsonApi
@@ -106,35 +108,37 @@ interface FactoryInterface extends ModelsFactoryInterface
      */
     public function createTranslator();
 
-    /** @noinspection PhpTooManyParametersInspection
-     * @param string                      $class
-     * @param PDO                         $pdo
-     * @param SchemaStorageInterface      $schemaStorage
-     * @param QueryBuilderInterface       $builder
-     * @param FilterOperationsInterface   $filterOperations
-     * @param PaginationStrategyInterface $relationshipPaging
-     * @param TranslatorInterface         $translator
-     * @param bool                        $isExecuteOnByOne
+    /**
+     * @param Connection                $connection
+     * @param SchemaStorageInterface    $schemaStorage
+     * @param FilterOperationsInterface $filterOperations
+     * @param TranslatorInterface       $translator
      *
      * @return RepositoryInterface
      */
     public function createRepository(
-        $class,
-        PDO $pdo,
+        Connection $connection,
         SchemaStorageInterface $schemaStorage,
-        QueryBuilderInterface $builder,
         FilterOperationsInterface $filterOperations,
-        PaginationStrategyInterface $relationshipPaging,
-        TranslatorInterface $translator,
-        $isExecuteOnByOne = true
+        TranslatorInterface $translator
     );
 
     /**
-     * @param RepositoryInterface $repository
+     * @param string                      $modelClass
+     * @param RepositoryInterface         $repository
+     * @param SchemaStorageInterface      $modelSchemes
+     * @param PaginationStrategyInterface $paginationStrategy
+     * @param TranslatorInterface         $translator
      *
      * @return CrudInterface
      */
-    public function createCrud(RepositoryInterface $repository);
+    public function createCrud(
+        $modelClass,
+        RepositoryInterface $repository,
+        SchemaStorageInterface $modelSchemes,
+        PaginationStrategyInterface $paginationStrategy,
+        TranslatorInterface $translator
+    );
 
     /**
      * @param array                  $schemes

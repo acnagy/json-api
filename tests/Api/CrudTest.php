@@ -1,4 +1,4 @@
-<?php namespace Limoncello\Tests\JsonApi;
+<?php namespace Limoncello\Tests\JsonApi\Api;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,14 +16,17 @@
  * limitations under the License.
  */
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use Limoncello\JsonApi\Adapters\FilterOperations;
 use Limoncello\JsonApi\Adapters\PaginationStrategy;
-use Limoncello\JsonApi\Adapters\Repository;
-use Limoncello\JsonApi\Builders\QueryBuilder;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
-use Limoncello\JsonApi\Contracts\CrudInterface;
+use Limoncello\JsonApi\Contracts\Api\CrudInterface;
 use Limoncello\JsonApi\Contracts\Document\ParserInterface;
 use Limoncello\JsonApi\Factory;
+use Limoncello\Tests\JsonApi\Data\Api\CommentsApi;
+use Limoncello\Tests\JsonApi\Data\Api\PostsApi;
+use Limoncello\Tests\JsonApi\Data\Api\UsersApi;
 use Limoncello\Tests\JsonApi\Data\Migrations\Runner as MigrationRunner;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
@@ -34,8 +37,7 @@ use Limoncello\Tests\JsonApi\Data\Seeds\Runner as SeedRunner;
 use Limoncello\Tests\JsonApi\Data\Transformers\CommentOnCreate;
 use Limoncello\Tests\JsonApi\Data\Transformers\CommentOnUpdate;
 use Limoncello\Tests\JsonApi\Data\Transformers\PostOnCreate;
-use Mockery;
-use Mockery\Mock;
+use Limoncello\Tests\JsonApi\TestCase;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Document\ErrorInterface;
 use Neomerx\JsonApi\Exceptions\JsonApiException;
@@ -49,9 +51,9 @@ class CrudTest extends TestCase
     const DEFAULT_PAGE = 3;
 
     /**
-     * @var PDO
+     * @var Connection
      */
-    private $pdo;
+    private $connection;
 
     /**
      * Set up tests.
@@ -67,13 +69,11 @@ class CrudTest extends TestCase
      */
     public function init()
     {
-        $this->pdo = new PDO('sqlite::memory:', null, null, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-        ]);
-        $this->assertNotSame(false, $this->pdo->exec('PRAGMA foreign_keys = ON;'));
+        $this->connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:']);
+        $this->assertNotSame(false, $this->connection->exec('PRAGMA foreign_keys = ON;'));
 
-        (new MigrationRunner())->migrate($this->pdo);
-        (new SeedRunner())->run($this->pdo);
+        (new MigrationRunner())->migrate($this->connection->getSchemaManager());
+        (new SeedRunner())->run($this->connection);
 
         return $this;
     }
@@ -108,7 +108,7 @@ class CrudTest extends TestCase
         }
 EOT;
 
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
 
         $parser   = $this->createPostParserForCreate();
         $resource = $parser->parse($json);
@@ -166,7 +166,7 @@ EOT;
             }
         }
 EOT;
-        $crud = $this->createCrud(Comment::class);
+        $crud = $this->createCrud(CommentsApi::class);
 
         $parser   = $this->createCommentParserForCreate();
         $resource = $parser->parse($json);
@@ -183,13 +183,14 @@ EOT;
         $this->assertNotEmpty($index = $model->{Comment::FIELD_ID});
 
         // check resources is saved
-        $res = $this->pdo->query('SELECT * FROM ' . Comment::TABLE_NAME . ' WHERE ' . Comment::FIELD_ID . " = $index")
+        $res = $this->connection
+            ->query('SELECT * FROM ' . Comment::TABLE_NAME . ' WHERE ' . Comment::FIELD_ID . " = $index")
             ->fetch(PDO::FETCH_ASSOC);
         $this->assertNotEquals(false, $res);
         $this->assertEquals($userId, $res[Comment::FIELD_ID_USER]);
         $this->assertEquals($postId, $res[Comment::FIELD_ID_POST]);
         // check resource to-many relationship are saved
-        $res = $this->pdo->query(
+        $res = $this->connection->query(
             'SELECT * FROM ' . CommentEmotion::TABLE_NAME . ' WHERE ' . CommentEmotion::FIELD_ID_COMMENT . " = $index"
         )->fetchAll(PDO::FETCH_ASSOC);
         $this->assertNotEquals(false, $res);
@@ -250,7 +251,7 @@ EOT;
             }
         }
 EOT;
-        $crud = $this->createCrud(Comment::class);
+        $crud = $this->createCrud(CommentsApi::class);
 
         $parser   = $this->createCommentParserForUpdate();
         $resource = $parser->parse($json);
@@ -290,11 +291,11 @@ EOT;
     }
 
     /**
-     * @expectedException \PDOException
+     * @expectedException \Doctrine\DBAL\Exception\DriverException
      */
     public function testDeleteResourceWithConstraints()
     {
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
         $crud->delete(1);
     }
 
@@ -303,7 +304,7 @@ EOT;
      */
     public function testReadWithIncludes()
     {
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
 
         $index        = 18;
         $s            = DocumentInterface::PATH_SEPARATOR;
@@ -313,7 +314,7 @@ EOT;
             Post::REL_COMMENTS . $s . Comment::REL_EMOTIONS,
             Post::REL_COMMENTS . $s . Comment::REL_POST . $s . Post::REL_USER,
         ];
-        $data         = $crud->read($index, null, $includePaths);
+        $data = $crud->read($index, null, $includePaths);
         $this->assertNotNull($data);
         $this->assertNotNull($model = $data->getPaginatedData()->getData());
         $this->assertFalse($data->getPaginatedData()->isCollection());
@@ -369,7 +370,7 @@ EOT;
      */
     public function testIndex()
     {
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
         $s    = DocumentInterface::PATH_SEPARATOR;
 
         $includePaths = [
@@ -407,11 +408,29 @@ EOT;
     }
 
     /**
+     * Test index.
+     */
+    public function testCommentsIndex()
+    {
+        // check that API returns comments from only specific user (as configured in Comments API)
+        $expectedUserId = 1;
+
+        $crud = $this->createCrud(CommentsApi::class);
+
+        $data = $crud->index();
+
+        $this->assertNotEmpty($comments = $data->getPaginatedData()->getData());
+        foreach ($comments as $comment) {
+            $this->assertEquals($expectedUserId, $comment->{Comment::FIELD_ID_USER});
+        }
+    }
+
+    /**
      * Test read relationship.
      */
     public function testReadRelationship()
     {
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
 
         $sortParameters   = [
             Comment::FIELD_ID_USER => false,
@@ -428,7 +447,13 @@ EOT;
             Comment::FIELD_TEXT    => ['like' => '%'],
         ];
 
-        $data = $crud->readRelationship(1, Post::REL_COMMENTS, $filterParameters, $sortParameters, $pagingParameters);
+        $data = $crud->readRelationship(
+            1,
+            Post::REL_COMMENTS,
+            $filterParameters,
+            $sortParameters,
+            $pagingParameters
+        );
 
         $this->assertNotEmpty($data->getData());
         $this->assertCount($pagingSize, $data->getData());
@@ -444,7 +469,7 @@ EOT;
      */
     public function testIndexWithFilterByBooleanColumn()
     {
-        $crud = $this->createCrud(User::class);
+        $crud = $this->createCrud(UsersApi::class);
 
         $filteringParameters = [
             User::FIELD_IS_ACTIVE => ['eq' => '1'],
@@ -455,7 +480,7 @@ EOT;
         $this->assertNotEmpty($users);
 
         $query   = 'SELECT COUNT(*) FROM ' . User::TABLE_NAME . ' WHERE ' . User::FIELD_IS_ACTIVE . ' = 1';
-        $actives = $this->pdo->query($query)->fetch(PDO::FETCH_NUM)[0];
+        $actives = $this->connection->query($query)->fetch(PDO::FETCH_NUM)[0];
 
         $this->assertEquals($actives, count($users));
     }
@@ -465,11 +490,11 @@ EOT;
      */
     public function testIndexWithEqualsOperator()
     {
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
 
         $index = 2;
         $filteringParameters = [
-            Post::FIELD_ID => $index,
+            Post::FIELD_ID => ['eq' => $index],
         ];
 
         $data = $crud->index($filteringParameters);
@@ -485,7 +510,7 @@ EOT;
      */
     public function testIndexWithInvalidPrimaryFilters()
     {
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
 
         $filteringParameters = [
             Post::REL_USER => ['CCC'  => '5'],
@@ -503,40 +528,8 @@ EOT;
         $errors = $exception->getErrors();
         $this->assertCount(1, $errors);
 
-        $this->assertEquals('CCC', $errors[0]->getSource()[ErrorInterface::SOURCE_PARAMETER]);
-    }
-
-    /**
-     * Check multiple queries executed all at once.
-     * The database used for testing (sqlite) do not support such mode. For this reason it will be tested with mocks.
-     */
-    public function testMultiQuery()
-    {
-        /** @var Mock $repoMock */
-        $repoMock = Mockery::mock(Repository::class);
-        $repoMock->makePartial()->shouldAllowMockingProtectedMethods();
-
-        $queries    = ['query'];
-        $parameters = [['params']];
-        $handlers   = [
-            function () {
-            }
-        ];
-
-        $query = 'some query';
-
-        $repoMock->shouldReceive('getBuilder')->once()->withNoArgs()->andReturnSelf();
-        $repoMock->shouldReceive('implode')->once()->with($queries)->andReturn($query);
-        $repoMock->shouldReceive('getPdo')->once()->withNoArgs()->andReturnSelf();
-        $repoMock->shouldReceive('prepare')->once()->withAnyArgs()->andReturnSelf();
-        $repoMock->shouldReceive('execute')->once()->withAnyArgs()->andReturnUndefined();
-        $repoMock->shouldReceive('nextRowset')->once()->withNoArgs()->andReturn(false);
-        $repoMock->shouldReceive('closeCursor')->once()->withAnyArgs()->andReturnUndefined();
-
-        /** @noinspection PhpUndefinedCallbackInspection */
-        call_user_func([$repoMock, 'execAllAtOnce'], $queries, $parameters, $handlers);
-
-        Mockery::close();
+        $this->assertEquals('user', $errors[0]->getSource()[ErrorInterface::SOURCE_PARAMETER]);
+        $this->assertEquals('ccc', $errors[0]->getDetail());
     }
 
     /**
@@ -544,7 +537,7 @@ EOT;
      */
     public function testIndexWithInvalidIncludePath()
     {
-        $crud = $this->createCrud(Post::class);
+        $crud = $this->createCrud(PostsApi::class);
 
         $includePaths = [
             Post::REL_COMMENTS . '.XXX',
@@ -562,37 +555,29 @@ EOT;
         $errors = $exception->getErrors();
         $this->assertCount(1, $errors);
 
-        $this->assertEquals(
-            '/data/relationships/' . Post::REL_COMMENTS . '.XXX',
-            $errors[0]->getSource()[ErrorInterface::SOURCE_POINTER]
-        );
+        $this->assertEquals('XXX', $errors[0]->getSource()[ErrorInterface::SOURCE_PARAMETER]);
     }
 
     /**
      * @param string $class
-     * @param bool   $isOneByOne
      *
      * @return CrudInterface
      */
-    private function createCrud($class, $isOneByOne = true)
+    private function createCrud($class)
     {
         $factory          = new Factory();
-        $relPaging        = new PaginationStrategy(self::DEFAULT_PAGE);
         $translator       = $factory->createTranslator();
-        $queryBuilder     = new QueryBuilder($translator);
-        $filterOperations = new FilterOperations();
-        $schemaStorage    = $this->getModelSchemes();
+        $filterOperations = new FilterOperations($translator);
+        $modelSchemes     = $this->getModelSchemes();
         $repository       = $factory->createRepository(
-            $class,
-            $this->pdo,
-            $schemaStorage,
-            $queryBuilder,
+            $this->connection,
+            $modelSchemes,
             $filterOperations,
-            $relPaging,
-            $translator,
-            $isOneByOne
+            $translator
         );
-        $crud             = $factory->createCrud($repository);
+
+        $relPaging = new PaginationStrategy(self::DEFAULT_PAGE);
+        $crud      = new $class($factory, $repository, $modelSchemes, $relPaging, $translator);
 
         return $crud;
     }

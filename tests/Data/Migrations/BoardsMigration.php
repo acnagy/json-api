@@ -16,33 +16,29 @@
  * limitations under the License.
  */
 
-use Limoncello\Tests\JsonApi\Data\Models\Board;
-use PDO;
+use Limoncello\Tests\JsonApi\Data\Models\Board as Model;
 
 /**
  * @package Limoncello\Tests\JsonApi
  */
 class BoardsMigration extends Migration
 {
-    /**
-     * @inheritdoc
-     */
-    public function migrate(PDO $pdo)
-    {
-        $this->createTable($pdo, Board::TABLE_NAME, [
-            $this->primaryInt(Board::FIELD_ID),
-            $this->textUnique(Board::FIELD_TITLE),
-            $this->date(Board::FIELD_CREATED_AT),
-            $this->date(Board::FIELD_UPDATED_AT),
-            $this->date(Board::FIELD_DELETED_AT),
-        ]);
-    }
+    /** @inheritdoc */
+    const MODEL_CLASS = Model::class;
 
     /**
      * @inheritdoc
      */
-    public function rollback(PDO $pdo)
+    public function migrate()
     {
-        $this->dropTable($pdo, Board::TABLE_NAME);
+        $this->createTable(Model::TABLE_NAME, [
+            $this->primaryInt(Model::FIELD_ID),
+            $this->string(Model::FIELD_TITLE),
+            $this->datetime(Model::FIELD_CREATED_AT),
+            $this->nullableDatetime(Model::FIELD_UPDATED_AT),
+            $this->nullableDatetime(Model::FIELD_DELETED_AT),
+
+            $this->unique([Model::FIELD_TITLE]),
+        ]);
     }
 }

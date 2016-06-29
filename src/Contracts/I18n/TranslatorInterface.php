@@ -34,7 +34,10 @@ interface TranslatorInterface
     const MSG_ERR_QUERY_IS_NOT_CONFIGURED = 'Builder query is not configured.';
 
     /** Message id */
-    const MSG_ERR_INVALID_FIELD = 'Invalid field.';
+    const MSG_ERR_INVALID_PARAMETER = 'Invalid parameter.';
+
+    /** Message id */
+    const MSG_ERR_INVALID_OPERATION = 'Invalid operation.';
 
     /**
      * @param string $messageId

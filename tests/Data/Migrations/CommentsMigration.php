@@ -16,39 +16,29 @@
  * limitations under the License.
  */
 
-use Limoncello\Tests\JsonApi\Data\Models\Comment;
-use Limoncello\Tests\JsonApi\Data\Models\Post;
-use Limoncello\Tests\JsonApi\Data\Models\User;
-use PDO;
+use Limoncello\Tests\JsonApi\Data\Models\Comment as Model;
 
 /**
  * @package Limoncello\Tests\JsonApi
  */
 class CommentsMigration extends Migration
 {
-    /**
-     * @inheritdoc
-     */
-    public function migrate(PDO $pdo)
-    {
-        $this->createTable($pdo, Comment::TABLE_NAME, [
-            $this->primaryInt(Comment::FIELD_ID),
-            $this->int(Comment::FIELD_ID_USER),
-            $this->int(Comment::FIELD_ID_POST),
-            $this->text(Comment::FIELD_TEXT),
-            $this->date(Comment::FIELD_CREATED_AT),
-            $this->date(Comment::FIELD_UPDATED_AT),
-            $this->date(Comment::FIELD_DELETED_AT),
-            $this->foreignKey(Comment::FIELD_ID_USER, User::TABLE_NAME, User::FIELD_ID),
-            $this->foreignKey(Comment::FIELD_ID_POST, Post::TABLE_NAME, Post::FIELD_ID),
-        ]);
-    }
+    /** @inheritdoc */
+    const MODEL_CLASS = Model::class;
 
     /**
      * @inheritdoc
      */
-    public function rollback(PDO $pdo)
+    public function migrate()
     {
-        $this->dropTable($pdo, Comment::TABLE_NAME);
+        $this->createTable(Model::TABLE_NAME, [
+            $this->primaryInt(Model::FIELD_ID),
+            $this->relationship(Model::REL_USER),
+            $this->relationship(Model::REL_POST),
+            $this->text(Model::FIELD_TEXT),
+            $this->datetime(Model::FIELD_CREATED_AT),
+            $this->nullableDatetime(Model::FIELD_UPDATED_AT),
+            $this->nullableDatetime(Model::FIELD_DELETED_AT),
+        ]);
     }
 }

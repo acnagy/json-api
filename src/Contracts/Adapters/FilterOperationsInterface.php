@@ -15,8 +15,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-use Generator;
+use Doctrine\DBAL\Query\Expression\CompositeExpression;
+use Doctrine\DBAL\Query\QueryBuilder;
+use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
  * @package Limoncello\JsonApi
@@ -24,28 +25,212 @@ use Generator;
 interface FilterOperationsInterface
 {
     /**
-     * @param string $name
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
      *
-     * @return bool
+     * @return void
      */
-    public function hasOperation($name);
+    public function applyEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
 
     /**
-     * @param string $table
-     * @param string $field
-     * @param array  $arguments
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
      *
-     * @return Generator
+     * @return void
      */
-    public function getDefaultOperation($table, $field, array $arguments);
+    public function applyNotEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
 
     /**
-     * @param string $name
-     * @param string $table
-     * @param string $field
-     * @param array  $arguments
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
      *
-     * @return Generator
+     * @return void
      */
-    public function getOperations($name, $table, $field, array $arguments);
+    public function applyGreaterThan(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
+     *
+     * @return void
+     */
+    public function applyGreaterOrEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
+     *
+     * @return void
+     */
+    public function applyLessThan(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
+     *
+     * @return void
+     */
+    public function applyLessOrEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
+     *
+     * @return void
+     */
+    public function applyLike(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string|array        $params
+     *
+     * @return void
+     */
+    public function applyNotLike(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param array               $values
+     *
+     * @return void
+     */
+    public function applyIn(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        array $values
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param array               $values
+     *
+     * @return void
+     */
+    public function applyNotIn(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        array $values
+    );
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param string              $table
+     * @param string              $column
+     *
+     * @return void
+     */
+    public function applyIsNull(QueryBuilder $builder, CompositeExpression $link, $table, $column);
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param string              $table
+     * @param string              $column
+     *
+     * @return void
+     */
+    public function applyIsNotNull(QueryBuilder $builder, CompositeExpression $link, $table, $column);
 }

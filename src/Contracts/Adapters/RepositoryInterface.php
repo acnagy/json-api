@@ -16,9 +16,8 @@
  * limitations under the License.
  */
 
-use Closure;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Query\QueryBuilder;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
@@ -27,119 +26,102 @@ use Neomerx\JsonApi\Exceptions\ErrorCollection;
 interface RepositoryInterface
 {
     /**
-     * @param Closure $closure
+     * @param string $modelClass
      *
-     * @return void
+     * @return QueryBuilder
      */
-    public function inTransaction(Closure $closure);
+    public function index($modelClass);
 
     /**
-     * @param array|null $filterParams
-     * @param array|null $sortParams
-     * @param array|null $pagingParams
+     * @param string $modelClass
+     * @param array  $attributes
      *
-     * @return PaginatedDataInterface
+     * @return QueryBuilder
      */
-    public function index(array $filterParams = null, array $sortParams = null, array $pagingParams = null);
+    public function create($modelClass, array $attributes);
 
     /**
+     * @param string $modelClass
+     * @param string $indexBind
+     *
+     * @return QueryBuilder
+     */
+    public function read($modelClass, $indexBind);
+
+    /**
+     * @param string $modelClass
+     * @param string $indexBind
+     * @param string $relationshipName
+     *
+     * @return array [$builder, $resultClass, $relationshipType]
+     */
+    public function readRelationship($modelClass, $indexBind, $relationshipName);
+
+    /**
+     * @param string     $modelClass
      * @param int|string $index
+     * @param array      $attributes
      *
-     * @return mixed
+     * @return QueryBuilder
      */
-    public function read($index);
+    public function update($modelClass, $index, array $attributes);
 
     /**
-     * @param array $models
-     * @param array $paths
+     * @param string $modelClass
+     * @param string $indexBind
      *
-     * @return RelationshipStorageInterface
+     * @return QueryBuilder
      */
-    public function readRelationships(array $models, array $paths);
+    public function delete($modelClass, $indexBind);
 
     /**
-     * @param int|string $index
-     * @param string     $relationshipName
-     * @param array|null $filterParams
-     * @param array|null $sortParams
-     * @param array|null $pagingParams
-     *
-     * @return PaginatedDataInterface
-     */
-    public function readRelationship(
-        $index,
-        $relationshipName,
-        array $filterParams = null,
-        array $sortParams = null,
-        array $pagingParams = null
-    );
-
-    /**
-     * @param null|string|int $identity
-     *
-     * @return mixed
-     */
-    public function instance($identity = null);
-
-    /**
-     * @param int|string $index
-     *
-     * @return void
-     */
-    public function delete($index);
-
-    /**
-     * @param mixed $model
-     *
-     * @return int|string
-     */
-    public function create($model);
-
-    /**
-     * @param mixed $model
-     * @param mixed $original
-     *
-     * @return void
-     */
-    public function update($model, $original);
-
-    /**
-     * @param mixed  $model
+     * @param string $modelClass
+     * @param string $indexBind
      * @param string $name
-     * @param string $value
+     * @param string $otherIndexBind
+     *
+     * @return QueryBuilder
+     */
+    public function createToManyRelationship($modelClass, $indexBind, $name, $otherIndexBind);
+
+    /**
+     * @param string $modelClass
+     * @param string $indexBind
+     * @param string $name
+     *
+     * @return QueryBuilder
+     */
+    public function cleanToManyRelationship($modelClass, $indexBind, $name);
+
+    /**
+     * @param ErrorCollection $errors
+     * @param QueryBuilder    $builder
+     * @param string          $modelClass
+     * @param array           $filterParams
      *
      * @return void
      */
-    public function setAttribute($model, $name, $value);
+    public function applyFilters(ErrorCollection $errors, QueryBuilder $builder, $modelClass, array $filterParams);
 
     /**
-     * @param mixed      $model
-     * @param string     $name
-     * @param string|int $value
+     * @param QueryBuilder $builder
+     * @param string       $modelClass
+     * @param array        $sortParams
      *
      * @return void
      */
-    public function setToOneRelationship($model, $name, $value);
+    public function applySorting(QueryBuilder $builder, $modelClass, array $sortParams);
 
     /**
-     * @param int|string $index
-     * @param string     $name
-     * @param array      $values
+     * @param string $modelClass
+     * @param string $relationshipName
      *
-     * @return void
+     * @return array [$builder, $resultClass, $relationshipType, $table, $column]
      */
-    public function saveToManyRelationship($index, $name, array $values);
+    public function createRelationshipBuilder($modelClass, $relationshipName);
 
     /**
-     * @param int|string $index
-     * @param string     $name
-     *
-     * @return void
+     * @return Connection
      */
-    public function cleanToManyRelationship($index, $name);
-
-    /**
-     * @return ErrorCollection
-     */
-    public function getErrors();
+    public function getConnection();
 }

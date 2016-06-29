@@ -17,9 +17,10 @@
  */
 
 use Interop\Container\ContainerInterface;
-use Limoncello\JsonApi\Contracts\CrudInterface;
+use Limoncello\JsonApi\Contracts\Api\CrudInterface;
 use Limoncello\JsonApi\Contracts\Document\ParserInterface;
 use Limoncello\JsonApi\Contracts\Document\ResourceInterface;
+use Limoncello\JsonApi\Contracts\Document\TransformerInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\Http\ControllerInterface;
 use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as SchemesContainerInterface;
@@ -192,20 +193,14 @@ abstract class BaseController implements ControllerInterface
      */
     protected static function parseInputOnCreate(ContainerInterface $container, ServerRequestInterface $request)
     {
-        /** @var FactoryInterface $factory */
-        $factory = $container->get(FactoryInterface::class);
-
-        /** @var SchemaStorageInterface $modelSchemes */
-        $modelSchemes = $container->get(SchemaStorageInterface::class);
-
-        /** @var SchemesContainerInterface $jsonSchemes */
-        $jsonSchemes = $container->get(SchemesContainerInterface::class);
-
-        $translator = $factory->createTranslator();
-
         $transformerClass = static::CREATE_TRANSFORMER_CLASS;
-        $transformer      = new $transformerClass($jsonSchemes, $modelSchemes, $translator);
-        $parsed           = self::parseBody($factory->createParser($transformer, $translator), $request);
+        /** @var TransformerInterface $transformer */
+        $transformer      = new $transformerClass($container);
+
+        /** @var FactoryInterface $factory */
+        $factory    = $container->get(FactoryInterface::class);
+        $translator = $factory->createTranslator();
+        $parsed     = self::parseBody($factory->createParser($transformer, $translator), $request);
 
         return $parsed;
     }
@@ -218,20 +213,14 @@ abstract class BaseController implements ControllerInterface
      */
     protected static function parseInputOnUpdate(ContainerInterface $container, ServerRequestInterface $request)
     {
-        /** @var FactoryInterface $factory */
-        $factory = $container->get(FactoryInterface::class);
-
-        /** @var SchemaStorageInterface $modelSchemes */
-        $modelSchemes = $container->get(SchemaStorageInterface::class);
-
-        /** @var SchemesContainerInterface $jsonSchemes */
-        $jsonSchemes = $container->get(SchemesContainerInterface::class);
-
-        $translator = $factory->createTranslator();
-
         $transformerClass = static::UPDATE_TRANSFORMER_CLASS;
-        $transformer      = new $transformerClass($jsonSchemes, $modelSchemes, $translator);
-        $parsed           = self::parseBody($factory->createParser($transformer, $translator), $request);
+        /** @var TransformerInterface $transformer */
+        $transformer      = new $transformerClass($container);
+
+        /** @var FactoryInterface $factory */
+        $factory    = $container->get(FactoryInterface::class);
+        $translator = $factory->createTranslator();
+        $parsed     = self::parseBody($factory->createParser($transformer, $translator), $request);
 
         return $parsed;
     }
@@ -257,7 +246,8 @@ abstract class BaseController implements ControllerInterface
             $factory->createTranslator(),
             $schemaClass
         );
-        $result           = $queryTransformer->mapParameters($errors, $parameters);
+
+        $result = $queryTransformer->mapParameters($errors, $parameters);
         if ($errors->count() > 0) {
             throw new JsonApiException($errors);
         }

@@ -16,293 +16,312 @@
  * limitations under the License.
  */
 
-use Closure;
+use Doctrine\DBAL\Query\Expression\CompositeExpression;
+use Doctrine\DBAL\Query\QueryBuilder;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
-use Limoncello\JsonApi\Contracts\QueryBuilderInterface;
+use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
+use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.TooManyPublicMethods)
  */
 class FilterOperations implements FilterOperationsInterface
 {
-    /** Default filter operation */
-    const DEFAULT_OPERATION = self::EQ;
-
-    /** Operation name */
-    const EQ = 'eq';
-
-    /** Operation name */
-    const EQUALS = 'equals';
-
-    /** Operation name */
-    const NE = 'ne';
-
-    /** Operation name */
-    const NOT_EQUALS = 'not-equals';
-
-    /** Operation name */
-    const GT = 'gt';
-
-    /** Operation name */
-    const GREATER_THAN = 'greater-than';
-
-    /** Operation name */
-    const GE = 'ge';
-
-    /** Operation name */
-    const GREATER_OR_EQUALS = 'greater-or-equals';
-
-    /** Operation name */
-    const LT = 'lt';
-
-    /** Operation name */
-    const LESS_THAN = 'less-than';
-
-    /** Operation name */
-    const LE = 'le';
-
-    /** Operation name */
-    const LESS_OR_EQUALS = 'less-or-equals';
-
-    /** Operation name */
-    const LIKE = 'like';
-
-    /** Operation name */
-    const IN = 'in';
+    /**
+     * @var T
+     */
+    private $translator;
 
     /**
-     * @var Closure[]
+     * @var string|null
      */
-    protected $handlers;
+    private $errMsgInvalidParam = null;
 
     /**
-     * Constructor.
+     * FilterOperations constructor.
+     *
+     * @param T $translator
      */
-    public function __construct()
+    public function __construct(T $translator)
     {
-        $this->handlers = [
-            self::EQ                => [$this, 'getHandlerForEq'],
-            self::EQUALS            => [$this, 'getHandlerForEq'],
-            self::NE                => [$this, 'getHandlerForNe'],
-            self::NOT_EQUALS        => [$this, 'getHandlerForNe'],
-            self::GT                => [$this, 'getHandlerForGt'],
-            self::GREATER_THAN      => [$this, 'getHandlerForGt'],
-            self::GE                => [$this, 'getHandlerForGe'],
-            self::GREATER_OR_EQUALS => [$this, 'getHandlerForGe'],
-            self::LT                => [$this, 'getHandlerForLt'],
-            self::LESS_THAN         => [$this, 'getHandlerForLt'],
-            self::LE                => [$this, 'getHandlerForLe'],
-            self::LESS_OR_EQUALS    => [$this, 'getHandlerForLe'],
-            self::LIKE              => [$this, 'getHandlerForLike'],
-            self::IN                => [$this, 'getHandlerForIn'],
-        ];
+        $this->translator = $translator;
     }
 
     /**
      * @inheritdoc
      */
-    public function hasOperation($name)
-    {
-        $name   = $this->normalizeOperation($name);
-        $result = array_key_exists($name, $this->handlers);
-
-        return $result;
+    public function applyEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'eq', $params);
     }
 
     /**
      * @inheritdoc
      */
-    public function getDefaultOperation($table, $field, array $arguments)
-    {
-        return $this->getOperations(static::DEFAULT_OPERATION, $table, $field, $arguments);
+    public function applyNotEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'neq', $params);
     }
 
     /**
      * @inheritdoc
      */
-    public function getOperations($name, $table, $field, array $arguments)
-    {
-        $name    = $this->normalizeOperation($name);
-        $handler = $this->getHandler($name);
-        $result  = call_user_func($handler, $table, $field, $arguments);
-
-        return $result;
+    public function applyGreaterThan(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'gt', $params);
     }
 
     /**
-     * @param string   $name
-     * @param Closure $handler
-     *
-     * @return void
+     * @inheritdoc
      */
-    public function register($name, Closure $handler)
-    {
-        $name = $this->normalizeOperation($name);
-        $this->handlers[$name] = $handler;
+    public function applyGreaterOrEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'gte', $params);
     }
 
     /**
-     * @param string $name
-     *
-     * @return void
+     * @inheritdoc
      */
-    public function unregister($name)
-    {
-        $name = $this->normalizeOperation($name);
-        unset($this->handlers[$name]);
+    public function applyLessThan(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'lt', $params);
     }
 
     /**
-     * @param string $name
-     *
-     * @return Closure
+     * @inheritdoc
      */
-    protected function getHandler($name)
-    {
-        $handler = $this->handlers[$name];
-        if (($handler instanceof Closure) === false) {
-            $handler = call_user_func($handler);
-            $this->handlers[$name] = $handler;
+    public function applyLessOrEquals(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'lte', $params);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function applyLike(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'like', $params);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function applyNotLike(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $params
+    ) {
+        $this->applyComparisonMethod($builder, $link, $errors, $table, $column, 'notLike', $params);
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function applyIn(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        array $values
+    ) {
+        if ($this->isArrayOfScalars($values) === false) {
+            $this->addInvalidQueryParameterError($errors, $column);
+            return;
         }
 
-        return $handler;
+        $placeholders = null;
+        foreach ($values as $value) {
+            $placeholders[] = $builder->createNamedParameter((string)$value);
+        }
+        $placeholders === null ?:
+            $link->add($builder->expr()->in($this->getTableColumn($table, $column), $placeholders));
     }
 
     /**
-     * @return Closure
+     * @inheritdoc
      */
-    protected function getHandlerForEq()
+    public function applyNotIn(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        array $values
+    ) {
+        if ($this->isArrayOfScalars($values) === false) {
+            $this->addInvalidQueryParameterError($errors, $column);
+            return;
+        }
+
+        $placeholders = null;
+        foreach ($values as $value) {
+            $placeholders[] = $builder->createNamedParameter((string)$value);
+        }
+        $placeholders === null ?:
+            $link->add($builder->expr()->notIn($this->getTableColumn($table, $column), $placeholders));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function applyIsNull(QueryBuilder $builder, CompositeExpression $link, $table, $column)
     {
-        return function ($table, $field, array $parameters) {
-            $result = null;
-            $value  = reset($parameters);
-            if ((is_string($value) === true || is_int($value) === true) && empty($value) === false) {
-                $result = [$table, $field, '=', $value];
-            } elseif ($value === null) {
-                $result = [$table, $field, QueryBuilderInterface::SQL_IS, $value];
+        $link->add($builder->expr()->isNull($this->getTableColumn($table, $column)));
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function applyIsNotNull(QueryBuilder $builder, CompositeExpression $link, $table, $column)
+    {
+        $link->add($builder->expr()->isNotNull($this->getTableColumn($table, $column)));
+    }
+
+    /**
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param ErrorCollection     $errors
+     * @param string              $table
+     * @param string              $column
+     * @param string              $method
+     * @param string|array        $params
+     *
+     * @return void
+     *
+     * @SuppressWarnings(PHPMD.ElseExpression)
+     */
+    protected function applyComparisonMethod(
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        ErrorCollection $errors,
+        $table,
+        $column,
+        $method,
+        $params
+    ) {
+        // params could be in form of 1 value or array of values
+
+        if (is_array($params) === true) {
+            foreach ($params as $param) {
+                if (is_scalar($param) === true) {
+                    $param = (string)$builder->createNamedParameter($param);
+                    $link->add($builder->expr()->{$method}($this->getTableColumn($table, $column), $param));
+                } else {
+                    $this->addInvalidQueryParameterError($errors, $column);
+                }
             }
-            yield $result;
-        };
+        } elseif (is_scalar($params) === true) {
+            $param = $builder->createNamedParameter((string)$params);
+            $link->add($builder->expr()->{$method}($this->getTableColumn($table, $column), $param));
+        } else {
+            // parameter is neither array nor string/scalar
+            $this->addInvalidQueryParameterError($errors, $column);
+        }
     }
 
     /**
-     * @return Closure
+     * @return T
      */
-    protected function getHandlerForNe()
+    protected function getTranslator()
     {
-        return function ($table, $field, array $parameters) {
-            $result = null;
-            $value  = reset($parameters);
-            if (is_string($value) === true && empty($value) === false) {
-                $result = [$table, $field, '<>', $value];
-            } elseif ($value === null) {
-                $result = [$table, $field, QueryBuilderInterface::SQL_IS_NOT, $value];
+        return $this->translator;
+    }
+
+    /**
+     * @param ErrorCollection $errors
+     * @param string          $name
+     *
+     * @return void
+     */
+    protected function addInvalidQueryParameterError(ErrorCollection $errors, $name)
+    {
+        $errors->addQueryParameterError($name, $this->getInvalidParameterErrorMessage());
+    }
+
+    /**
+     * @return string
+     */
+    protected function getInvalidParameterErrorMessage()
+    {
+        if ($this->errMsgInvalidParam === null) {
+            $this->errMsgInvalidParam = $this->getTranslator()->get(T::MSG_ERR_INVALID_PARAMETER);
+        }
+
+        return $this->errMsgInvalidParam;
+    }
+
+    /**
+     * @param array $input
+     *
+     * @return bool
+     */
+    private function isArrayOfScalars(array $input)
+    {
+        foreach ($input as $value) {
+            if (is_scalar($value) === false) {
+                return false;
             }
-            yield $result;
-        };
+        }
+
+        return true;
     }
 
     /**
-     * @return Closure
-     */
-    protected function getHandlerForGt()
-    {
-        return $this->getSingleParamHandler('>');
-    }
-
-    /**
-     * @return Closure
-     */
-    protected function getHandlerForGe()
-    {
-        return $this->getSingleParamHandler('>=');
-    }
-
-    /**
-     * @return Closure
-     */
-    protected function getHandlerForLt()
-    {
-        return $this->getSingleParamHandler('<');
-    }
-
-    /**
-     * @return Closure
-     */
-    protected function getHandlerForLe()
-    {
-        return $this->getSingleParamHandler('<=');
-    }
-
-    /**
-     * @return Closure
-     */
-    protected function getHandlerForLike()
-    {
-        return $this->getMultiParamMultiYieldHandler('LIKE');
-    }
-
-    /**
-     * @return Closure
-     */
-    protected function getHandlerForIn()
-    {
-        return $this->getMultiParamSingleYieldHandler('IN');
-    }
-
-    /**
-     * @param string $name
+     * @param string $table
+     * @param string $column
      *
      * @return string
      */
-    protected function normalizeOperation($name)
+    private function getTableColumn($table, $column)
     {
-        return strtolower($name);
-    }
-
-    /**
-     * @param string $operation
-     *
-     * @return Closure
-     */
-    protected function getSingleParamHandler($operation)
-    {
-        return function ($table, $field, array $parameters) use ($operation) {
-            $value  = reset($parameters);
-            if (is_string($value) === true && empty($value) === false) {
-                $result = [$table, $field, $operation, $value];
-                yield $result;
-            }
-        };
-    }
-
-    /**
-     * @param string $operation
-     *
-     * @return Closure
-     */
-    protected function getMultiParamMultiYieldHandler($operation)
-    {
-        return function ($table, $field, array $parameters) use ($operation) {
-            foreach ($parameters as $parameter) {
-                if (is_string($parameter) === true && empty($parameter) === false) {
-                    $result = [$table, $field, $operation, $parameter];
-                    yield $result;
-                }
-            }
-        };
-    }
-
-    /**
-     * @param string $operation
-     *
-     * @return Closure
-     */
-    protected function getMultiParamSingleYieldHandler($operation)
-    {
-        return function ($table, $field, array $parameters) use ($operation) {
-            $result = [$table, $field, $operation, $parameters];
-            yield $result;
-        };
+        return "`$table`.`$column`";
     }
 }

@@ -27,9 +27,6 @@ interface JsonApiConfigInterface
     /** Config key */
     const KEY_JSON = self::KEY_MODEL_TO_SCHEMA_MAP + 1;
 
-    /** Config key @deprecated */
-    const KEY_EXECUTE_DB_QUERIES_ONE_BY_ONE = self::KEY_JSON + 1;
-
     /** Config key */
     const KEY_JSON_RELATIONSHIP_PAGING_SIZE = 0;
 

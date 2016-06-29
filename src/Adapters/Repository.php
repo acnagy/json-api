@@ -16,65 +16,39 @@
  * limitations under the License.
  */
 
-use ArrayObject;
-use Closure;
-use Generator;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Query\Expression\CompositeExpression;
+use Doctrine\DBAL\Query\QueryBuilder;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
-use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
-use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
-use Limoncello\JsonApi\Contracts\QueryBuilderInterface;
-use Limoncello\Models\Contracts\ModelStorageInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
 use Limoncello\Models\Contracts\SchemaStorageInterface;
-use Limoncello\Models\Contracts\TagStorageInterface;
 use Limoncello\Models\RelationshipTypes;
-use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
-use PDO;
-use PDOStatement;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.TooManyPublicMethods)
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  */
 class Repository implements RepositoryInterface
 {
-    /** Path constant */
-    const ROOT_PATH      = '';
+    /** Filer constant */
+    const FILTER_OP_IS_NULL = 'is-null';
 
-    /** Path constant */
-    const PATH_SEPARATOR = DocumentInterface::PATH_SEPARATOR;
-
-    /**
-     * @var PDO
-     */
-    private $pdo;
+    /** Filer constant */
+    const FILTER_OP_IS_NOT_NULL = 'not-null';
 
     /**
-     * @var string
+     * @var Connection
      */
-    private $class;
-
-    /**
-     * @var FactoryInterface
-     */
-    private $factory;
+    private $connection;
 
     /**
      * @var SchemaStorageInterface
      */
-    private $schemaStorage;
-
-    /**
-     * @var QueryBuilderInterface
-     */
-    private $builder;
-
-    /**
-     * @var PaginationStrategyInterface
-     */
-    private $relationshipPaging;
+    private $modelSchemes;
 
     /**
      * @var FilterOperationsInterface
@@ -87,420 +61,228 @@ class Repository implements RepositoryInterface
     private $translator;
 
     /**
-     * @var bool
-     */
-    private $isExecuteOneByOne = true;
-
-    /**
-     * @var ErrorCollection
-     */
-    private $errors;
-
-    /**
-     * @param FactoryInterface            $factory
-     * @param string                      $class
-     * @param PDO                         $pdo
-     * @param SchemaStorageInterface      $schemaStorage
-     * @param QueryBuilderInterface       $builder
-     * @param FilterOperationsInterface   $filterOperations
-     * @param PaginationStrategyInterface $relationshipPaging
-     * @param T                           $translator
-     * @param bool                        $isExecuteOnByOne
+     * @param Connection                $connection
+     * @param SchemaStorageInterface    $modelSchemes
+     * @param FilterOperationsInterface $filterOperations
+     * @param T                         $translator
      */
     public function __construct(
-        FactoryInterface $factory,
-        $class,
-        PDO $pdo,
-        SchemaStorageInterface $schemaStorage,
-        QueryBuilderInterface $builder,
+        Connection $connection,
+        SchemaStorageInterface $modelSchemes,
         FilterOperationsInterface $filterOperations,
-        PaginationStrategyInterface $relationshipPaging,
-        T $translator,
-        $isExecuteOnByOne = true
+        T $translator
     ) {
-        $this->pdo                = $pdo;
-        $this->class              = $class;
-        $this->factory            = $factory;
-        $this->schemaStorage      = $schemaStorage;
-        $this->builder            = $builder;
-        $this->relationshipPaging = $relationshipPaging;
-        $this->filterOperations   = $filterOperations;
-        $this->translator         = $translator;
-        $this->isExecuteOneByOne  = $isExecuteOnByOne;
-
-        $this->resetErrors();
+        $this->connection       = $connection;
+        $this->modelSchemes     = $modelSchemes;
+        $this->filterOperations = $filterOperations;
+        $this->translator       = $translator;
     }
 
     /**
      * @inheritdoc
      */
-    public function getErrors()
+    public function index($modelClass)
     {
-        return $this->errors;
+        $builder = $this->getConnection()->createQueryBuilder();
+        $builder->select($this->getColumns($modelClass))->from($this->getTableName($modelClass));
+
+        return $builder;
     }
 
     /**
      * @inheritdoc
      */
-    public function instance($identity = null)
+    public function create($modelClass, array $attributes)
     {
-        $class = $this->getClass();
-        $model = new $class;
+        $builder = $this->getConnection()->createQueryBuilder();
 
-        $identity === null ?: $this->setPrimaryKey($model, $identity);
+        $valuesAsParams = [];
+        foreach ($attributes as $column => $value) {
+            $valuesAsParams[$column] = $builder->createPositionalParameter((string)$value);
+        }
 
-        return $model;
+        $builder
+            ->insert($this->getTableName($modelClass))
+            ->values($valuesAsParams);
+
+        return $builder;
     }
 
     /**
      * @inheritdoc
      */
-    public function setAttribute($model, $name, $value)
+    public function read($modelClass, $indexBind)
     {
-        $model->{$name} = $value;
+        $builder = $this->getConnection()->createQueryBuilder();
+        $table   = $this->getTableName($modelClass);
+        $builder->select($this->getColumns($modelClass))->from($table);
+        $this->addWhereBind($builder, $table, $this->getPrimaryKeyName($modelClass), $indexBind);
+
+        return $builder;
     }
 
     /**
      * @inheritdoc
      */
-    public function getAttribute($model, $name)
+    public function readRelationship($modelClass, $indexBind, $relationshipName)
     {
-        $value = $model->{$name};
+        list($builder, $resultClass, $relationshipType, $table, $column) =
+            $this->createRelationshipBuilder($modelClass, $relationshipName);
 
-        return $value;
+        $this->addWhereBind($builder, $table, $column, $indexBind);
+
+        return [$builder, $resultClass, $relationshipType];
     }
 
     /**
      * @inheritdoc
      */
-    public function hasAttribute($model, $name)
+    public function update($modelClass, $index, array $attributes)
     {
-        $hasAttribute = isset($model->{$name});
+        $builder = $this->getConnection()->createQueryBuilder();
 
-        return $hasAttribute;
+        $table = $this->getTableName($modelClass);
+        $builder->update($table);
+
+        foreach ($attributes as $name => $value) {
+            $builder->set($name, $builder->createPositionalParameter((string)$value));
+        }
+
+        $pkColumn = $this->buildTableColumn($table, $this->getPrimaryKeyName($modelClass));
+        $builder->where($pkColumn . '=' . $builder->createPositionalParameter($index));
+
+        return $builder;
     }
 
     /**
      * @inheritdoc
      */
-    public function inTransaction(Closure $closure)
+    public function delete($modelClass, $indexBind)
     {
-        $pdo = $this->getPdo();
-        $pdo->beginTransaction();
-        try {
-            $isOk = ($closure() === false ? null : true);
-        } finally {
-            isset($isOk) === true ? $pdo->commit() : $pdo->rollBack();
+        $builder = $this->getConnection()->createQueryBuilder();
+
+        $table = $this->getTableName($modelClass);
+        $builder->delete($table);
+        $this->addWhereBind($builder, $table, $this->getPrimaryKeyName($modelClass), $indexBind);
+
+        return $builder;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function createToManyRelationship($modelClass, $indexBind, $name, $otherIndexBind)
+    {
+        list ($intermediateTable, $foreignKey, $reverseForeignKey) =
+            $this->getModelSchemes()->getBelongsToManyRelationship($modelClass, $name);
+
+        $builder = $this->getConnection()->createQueryBuilder();
+        $builder
+            ->insert($intermediateTable)
+            ->values([
+                $foreignKey        => $indexBind,
+                $reverseForeignKey => $otherIndexBind,
+            ]);
+
+        return $builder;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function cleanToManyRelationship($modelClass, $indexBind, $name)
+    {
+        list ($intermediateTable, $foreignKey) =
+            $this->getModelSchemes()->getBelongsToManyRelationship($modelClass, $name);
+
+        $builder = $this->getConnection()->createQueryBuilder();
+        $builder
+            ->delete($intermediateTable);
+        $this->addWhereBind($builder, $intermediateTable, $foreignKey, $indexBind);
+
+        return $builder;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function applySorting(QueryBuilder $builder, $modelClass, array $sortParams)
+    {
+        $table = $this->getTableName($modelClass);
+        foreach ($sortParams as $column => $isAscending) {
+            $builder->addOrderBy($this->buildTableColumn($table, $column), $isAscending === true ? 'ASC' : 'DESC');
         }
     }
 
     /**
      * @inheritdoc
      */
-    public function index(array $filterParams = null, array $sortParams = null, array $pagingParams = null)
+    public function applyFilters(ErrorCollection $errors, QueryBuilder $builder, $modelClass, array $filterParams)
     {
-        $this->resetErrors();
+        $table = $this->getTableName($modelClass);
+        $linkWithAnd = $builder->expr()->andX();
 
-        $tableName = $this->getTableName();
-        $builder   = $this->getBuilder()
-            ->forTable($tableName)
-            ->select($this->getColumns($this->getClass()));
+        foreach ($filterParams as $field => $opAndParams) {
+            // it should be array of 'operation' => parameters (string/array)
+            if (is_array($opAndParams) === false) {
+                $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_PARAMETER);
+                $errors->addQueryParameterError($field, $errMsg);
+                continue;
+            }
 
-        $this->applyFiltersToQuery($tableName, $filterParams);
-        $this->applySortingToQuery($sortParams);
-
-        list ($offset, $limit) = $this->getRelationshipPaging()->parseParameters($pagingParams);
-        $builder->limit($limit, $offset);
-
-        list ($query, $params) = $builder->get();
-
-        $result = null;
-        if ($this->getErrors()->count() <= 0) {
-            $models = $this->queryMultiple($this->getClass(), $query, $params);
-            if ($models !== false) {
-                $hasMore = false;
-                if ($limit !== null && $offset !== true) {
-                    list($models, $hasMore, $limit, $offset) = $this->normalizePagingParams($models, $limit, $offset);
-                }
-                $result = $this->getFactory()->createPaginatedData($models, true, $hasMore, $offset, $limit);
+            foreach ($opAndParams as $operation => $params) {
+                $lcOp = strtolower((string)$operation);
+                $this->applyFilterToQuery($errors, $builder, $linkWithAnd, $table, $field, $lcOp, $params);
             }
         }
 
-        return $result;
+        $builder->andWhere($linkWithAnd);
     }
 
     /**
      * @inheritdoc
      */
-    public function read($index)
+    public function createRelationshipBuilder($modelClass, $relationshipName)
     {
-        $table = $this->getTableName();
+        $builder          = null;
+        $resultClass      = null;
+        $relationshipType = null;
+        $table            = null;
+        $column           = null;
 
-        list($query, $params) = $this->getBuilder()
-            ->forTable($table)
-            ->select($this->getColumns($this->getClass()))
-            ->where($this->singleWhere($table, $this->getPrimaryKeyName(), '=', $index))
-            ->get();
-
-        $model = $this->querySingle($this->getClass(), $query, $params);
-
-        return $model === false ? null : $model;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function readRelationships(array $models, array $paths)
-    {
-        $this->resetErrors();
-
-        $result = $this->getFactory()->createRelationshipStorage();
-
-        if (empty($models) === false && empty($paths) === false) {
-            $modelStorage = $this->getFactory()->createModelStorage($this->getSchemaStorage());
-            $modelsAtPath = $this->getFactory()->createTagStorage();
-
-            // we gonna send this storage via function params so it is an equivalent for &array
-            $classAtPath = new ArrayObject();
-
-            foreach ($models as $model) {
-                $uniqueModel = $modelStorage->register($model);
-                $modelsAtPath->register($uniqueModel, [self::ROOT_PATH]);
-            }
-            $classAtPath[self::ROOT_PATH] = get_class($models[0]);
-
-            foreach ($this->getPaths($paths) as list ($parentPath, $childPaths)) {
-                $this->uploadResources($result, $modelsAtPath, $classAtPath, $modelStorage, $parentPath, $childPaths);
-            }
-        }
-
-        return $result;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function readRelationship(
-        $index,
-        $relationshipName,
-        array $filterParams = null,
-        array $sortParams = null,
-        array $pagingParams = null
-    ) {
-        $this->resetErrors();
-
-        if ($this->getSchemaStorage()->hasRelationship($this->getClass(), $relationshipName) === false) {
-            $msg = $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
-            $this->getErrors()->addRelationshipError($relationshipName, $msg);
-            return null;
-        }
-
-        $offset = null;
-        $limit  = null;
-        list ($reverseClass, $reverseName) = $this->getSchemaStorage()
-            ->getReverseRelationship($this->getClass(), $relationshipName);
-        $tableName = $this->getSchemaStorage()->getTable($reverseClass);
-        $relationshipType = $this->getSchemaStorage()->getRelationshipType($this->getClass(), $relationshipName);
+        $relationshipType = $this->getModelSchemes()->getRelationshipType($modelClass, $relationshipName);
         switch ($relationshipType) {
             case RelationshipTypes::BELONGS_TO:
-                $indexClosure = function () use ($index) {
-                    yield $index;
-                };
-                $this->buildBelongsToQuery($this->getClass(), $indexClosure(), $relationshipName);
+                list($builder, $resultClass, $table, $column) =
+                    $this->createBelongsToBuilder($modelClass, $relationshipName);
                 break;
             case RelationshipTypes::HAS_MANY:
-                list ($offset, $limit) = $this->getRelationshipPaging()->parseParameters($pagingParams);
-                $this->buildHasManyQuery($reverseClass, $index, $reverseName, $offset, $limit);
+                list($builder, $resultClass, $table, $column) =
+                    $this->createHasManyBuilder($modelClass, $relationshipName);
                 break;
             case RelationshipTypes::BELONGS_TO_MANY:
-                list ($offset, $limit) = $this->getRelationshipPaging()->parseParameters($pagingParams);
-                $this->buildBelongsToManyQuery($this->getClass(), $index, $relationshipName, $offset, $limit);
+                list($builder, $resultClass, $table, $column) =
+                    $this->createBelongsToManyBuilder($modelClass, $relationshipName);
                 break;
         }
 
-        $this->applyFiltersToQuery($tableName, $filterParams);
-        $this->applySortingToQuery($sortParams);
-
-        list ($query, $params) = $this->getBuilder()->get();
-
-        $result = null;
-        if ($this->getErrors()->count() <= 0) {
-            $models = $this->queryMultiple($reverseClass, $query, $params);
-            if ($models !== false) {
-                $hasMore = false;
-                if ($limit !== null && $offset !== true) {
-                    list($models, $hasMore, $limit, $offset) = $this->normalizePagingParams($models, $limit, $offset);
-                }
-                $result = $this->getFactory()->createPaginatedData($models, true, $hasMore, $offset, $limit);
-            }
-        }
-
-        return $result;
+        return [$builder, $resultClass, $relationshipType, $table, $column];
     }
 
     /**
      * @inheritdoc
      */
-    public function delete($index)
+    public function getConnection()
     {
-        $table = $this->getTableName();
-        list($query, $params) = $this->getBuilder()
-            ->forTable($table)
-            ->delete()
-            ->where($this->singleWhere($table, $this->getPrimaryKeyName(), '=', $index))
-            ->get();
-        $this->execute($query, $params);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function create($model)
-    {
-        $columns = [];
-        $values  = [];
-        foreach ($this->getSchemaStorage()->getAttributes($this->getClass()) as $name) {
-            if ($this->hasAttribute($model, $name) === true) {
-                $value = $this->getAttribute($model, $name);
-                $columns[] = $name;
-                $values[]  = $value;
-            }
-        }
-
-        $get = function (array $values) {
-            foreach ($values as $value) {
-                yield $value;
-            }
-        };
-
-        $table = $this->getTableName();
-        list($query, $params) = $this->getBuilder()
-            ->forTable($table)
-            ->insert($get($columns), $get($values))
-            ->get();
-
-        $this->execute($query, $params);
-        $index = $this->getPdo()->lastInsertId();
-
-        return $index;
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function update($model, $original)
-    {
-        $getChanges = function () use ($original, $model) {
-            foreach ($this->getSchemaStorage()->getAttributes($this->getClass()) as $column) {
-                $originalValue = $this->getAttribute($original, $column);
-                $currentValue  = $this->getAttribute($model, $column);
-                if ($originalValue !== $currentValue) {
-                    yield $column => $currentValue;
-                }
-            }
-        };
-
-        $index = $this->getId($model);
-        $table = $this->getTableName();
-        list($query, $params) = $this->getBuilder()
-            ->forTable($table)
-            ->update($getChanges())
-            ->where($this->singleWhere($table, $this->getPrimaryKeyName(), '=', $index))
-            ->get();
-
-        $this->execute($query, $params);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function setToOneRelationship($model, $name, $value)
-    {
-        $key = $this->getSchemaStorage()->getForeignKey($this->getClass(), $name);
-        $this->setAttribute($model, $key, $value);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function saveToManyRelationship($index, $name, array $values)
-    {
-        list ($table, $foreignKey, $reverseForeignKey) =
-            $this->getSchemaStorage()->getBelongsToManyRelationship($this->getClass(), $name);
-        $reversIds = function () use ($index, $values) {
-            foreach ($values as $reverseIndex) {
-                yield $index;
-                yield $reverseIndex;
-                yield null;
-            }
-        };
-        $columns = function () use ($foreignKey, $reverseForeignKey) {
-            yield $foreignKey;
-            yield $reverseForeignKey;
-        };
-
-        list ($query, $params) = $this->getBuilder()
-            ->forTable($table)
-            ->insert($columns(), $reversIds())
-            ->get();
-
-        $this->execute($query, $params);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function cleanToManyRelationship($index, $name)
-    {
-        list ($table, $foreignKey) = $this->getSchemaStorage()->getBelongsToManyRelationship($this->getClass(), $name);
-
-        list($query, $params) = $this->getBuilder()
-            ->forTable($table)
-            ->delete()
-            ->where($this->singleWhere($table, $foreignKey, '=', $index))
-            ->get();
-
-        $this->execute($query, $params);
-    }
-
-    /**
-     * @return PDO
-     */
-    protected function getPdo()
-    {
-        return $this->pdo;
-    }
-
-    /**
-     * @return FactoryInterface
-     */
-    protected function getFactory()
-    {
-        return $this->factory;
+        return $this->connection;
     }
 
     /**
      * @return SchemaStorageInterface
      */
-    protected function getSchemaStorage()
+    protected function getModelSchemes()
     {
-        return $this->schemaStorage;
-    }
-
-    /**
-     * @return QueryBuilderInterface
-     */
-    protected function getBuilder()
-    {
-        return $this->builder;
-    }
-
-    /**
-     * @return PaginationStrategyInterface
-     */
-    protected function getRelationshipPaging()
-    {
-        return $this->relationshipPaging;
+        return $this->modelSchemes;
     }
 
     /**
@@ -512,14 +294,6 @@ class Repository implements RepositoryInterface
     }
 
     /**
-     * @inheritdoc
-     */
-    protected function getClass()
-    {
-        return $this->class;
-    }
-
-    /**
      * @return FilterOperationsInterface
      */
     protected function getFilterOperations()
@@ -528,52 +302,25 @@ class Repository implements RepositoryInterface
     }
 
     /**
-     * @return bool
-     */
-    protected function isExecuteOneByOne()
-    {
-        return $this->isExecuteOneByOne;
-    }
-
-    /**
-     * @param mixed $model
+     * @param string $class
      *
      * @return string
      */
-    protected function getId($model)
+    protected function getTableName($class)
     {
-        $pkName = $this->getSchemaStorage()->getPrimaryKey($this->getClass());
-        $key    = $this->getAttribute($model, $pkName);
-
-        return $key;
-    }
-
-    /**
-     * @param mixed      $model
-     * @param string|int $value
-     */
-    protected function setPrimaryKey($model, $value)
-    {
-        $pkName = $this->getSchemaStorage()->getPrimaryKey($this->getClass());
-        $this->setAttribute($model, $pkName, $value);
-    }
-
-    /**
-     * @return string
-     */
-    protected function getTableName()
-    {
-        $tableName = $this->getSchemaStorage()->getTable($this->getClass());
+        $tableName = $this->getModelSchemes()->getTable($class);
 
         return $tableName;
     }
 
     /**
+     * @param string $class
+     *
      * @return string
      */
-    protected function getPrimaryKeyName()
+    protected function getPrimaryKeyName($class)
     {
-        $primaryKey = $this->getSchemaStorage()->getPrimaryKey($this->getClass());
+        $primaryKey = $this->getModelSchemes()->getPrimaryKey($class);
 
         return $primaryKey;
     }
@@ -581,705 +328,214 @@ class Repository implements RepositoryInterface
     /**
      * @param string $class
      *
-     * @return Generator
+     * @return array
      */
     protected function getColumns($class)
     {
-        $table = $this->getSchemaStorage()->getTable($class);
-        foreach ($this->getSchemaStorage()->getAttributes($class) as $column) {
-            yield $table => $column;
+        $table   = $this->getModelSchemes()->getTable($class);
+        $columns = $this->getModelSchemes()->getAttributes($class);
+        $result  = [];
+        foreach ($columns as $column) {
+            $result[] = $this->getColumn($class, $table, $column);
         }
+
+        return $result;
     }
 
     /**
-     * @param array $paths
+     * @param string $class
+     * @param string $table
+     * @param string $column
      *
-     * @return Generator
+     * @return string
      */
-    protected function getPaths(array $paths)
+    protected function getColumn($class, $table, $column)
     {
-        // The idea is to normalize paths. It means build all intermediate paths.
-        // e.g. if only `a.b.c` path it given it will be normalized to `a`, `a.b` and `a.b.c`.
-        // Path depths store depth of each path (e.g. 0 for root, 1 for `a`, 2 for `a.b` and etc).
-        // It is needed for yielding them in correct order (from top level to bottom).
-        $normalizedPaths = [];
-        $pathsDepths     = [];
-        foreach ($paths as $path) {
-            $parentDepth = 0;
-            $tmpPath     = self::ROOT_PATH;
-            foreach (explode(self::PATH_SEPARATOR, $path) as $pathPiece) {
-                $parent                    = $tmpPath;
-                $tmpPath                   = empty($tmpPath) === true ?
-                    $pathPiece : $tmpPath . self::PATH_SEPARATOR . $pathPiece;
-                $normalizedPaths[$tmpPath] = [$parent, $pathPiece];
-                $pathsDepths[$parent]      = $parentDepth++;
-            }
-        }
+        $class ?: null; // suppress unused
 
-        // Here we collect paths in form of parent => [list of children]
-        // e.g. '' => ['a', 'c', 'b'], 'b' => ['bb', 'aa'] and etc
-        $parentWithChildren = [];
-        foreach ($normalizedPaths as $path => list ($parent, $childPath)) {
-            $parentWithChildren[$parent][] = $childPath;
-        }
-
-        // And finally sort by path depth and yield parent with its children. Top level paths first then deeper ones.
-        asort($pathsDepths, SORT_NUMERIC);
-        foreach ($pathsDepths as $parent => $depth) {
-            $childPaths = $parentWithChildren[$parent];
-            yield [$parent, $childPaths];
-        }
+        return "`$table`.`$column`";
     }
 
     /**
-     * @param RelationshipStorageInterface $relationshipStorage
-     * @param TagStorageInterface          $modelsAtPath
-     * @param ArrayObject                  $classAtPath
-     * @param ModelStorageInterface        $modelStorage
-     * @param string                       $parentsPath
-     * @param array                        $childRelationships
+     * @param ErrorCollection     $errors
+     * @param QueryBuilder        $builder
+     * @param CompositeExpression $link
+     * @param string              $table
+     * @param string              $field
+     * @param string              $operation
+     * @param array|string|null   $params
      *
      * @return void
-     */
-    protected function uploadResources(
-        RelationshipStorageInterface $relationshipStorage,
-        TagStorageInterface $modelsAtPath,
-        ArrayObject $classAtPath,
-        ModelStorageInterface $modelStorage,
-        $parentsPath,
-        array $childRelationships
-    ) {
-        $handlers = [];
-        $queries  = [];
-        $params   = [];
-        $parentsClass = $classAtPath[$parentsPath];
-        foreach ($childRelationships as $name) {
-            if ($this->getSchemaStorage()->hasRelationship($parentsClass, $name) === false) {
-                $msg = $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
-                $this->getErrors()->addRelationshipError($parentsPath . static::PATH_SEPARATOR . $name, $msg);
-                continue;
-            }
-            $relationshipType = $this->getSchemaStorage()->getRelationshipType($parentsClass, $name);
-            switch ($relationshipType) {
-                case RelationshipTypes::BELONGS_TO:
-                    list ($subQuery, $subParams, $subHandler) = $this->createBelongsToQueriesAndHandlers(
-                        $relationshipStorage,
-                        $modelsAtPath,
-                        $classAtPath,
-                        $modelStorage,
-                        $parentsPath,
-                        $name
-                    );
-                    $queries[]  = $subQuery;
-                    $params[]   = $subParams;
-                    $handlers[] = $subHandler;
-                    break;
-                case RelationshipTypes::HAS_MANY:
-                    $rootClass = $classAtPath[self::ROOT_PATH];
-                    list($offset, $limit) = $this->getRelationshipPaging()
-                        ->getParameters($rootClass, $parentsClass, $parentsPath, $name);
-                    list ($subQueries, $subParams, $subHandlers) = $this->createHasManyQueriesAndHandlers(
-                        $relationshipStorage,
-                        $modelsAtPath,
-                        $classAtPath,
-                        $modelStorage,
-                        $parentsPath,
-                        $parentsClass,
-                        $name,
-                        $offset,
-                        $limit
-                    );
-                    $queries  = array_merge($queries, $subQueries);
-                    $params   = array_merge($params, $subParams);
-                    $handlers = array_merge($handlers, $subHandlers);
-                    break;
-                case RelationshipTypes::BELONGS_TO_MANY:
-                    $rootClass = $classAtPath[self::ROOT_PATH];
-                    list($offset, $limit) = $this->getRelationshipPaging()
-                        ->getParameters($rootClass, $parentsClass, $parentsPath, $name);
-                    list ($subQueries, $subParams, $subHandlers) = $this->createBelongsToManyQueriesAndHandlers(
-                        $relationshipStorage,
-                        $modelsAtPath,
-                        $classAtPath,
-                        $modelStorage,
-                        $parentsPath,
-                        $parentsClass,
-                        $name,
-                        $offset,
-                        $limit
-                    );
-                    $queries  = array_merge($queries, $subQueries);
-                    $params   = array_merge($params, $subParams);
-                    $handlers = array_merge($handlers, $subHandlers);
-                    break;
-            }
-        }
-
-        $this->isExecuteOneByOne() === true ?
-            $this->execOneByOne($queries, $params, $handlers) : $this->execAllAtOnce($queries, $params, $handlers);
-    }
-
-    /**
-     * @param RelationshipStorageInterface $relationshipStorage
-     * @param TagStorageInterface          $modelsAtPath
-     * @param ArrayObject                  $classAtPath
-     * @param ModelStorageInterface        $modelStorage
-     * @param                              $manyPath
-     * @param                              $manyToOneRel
      *
-     * @return array
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
-    protected function createBelongsToQueriesAndHandlers(
-        RelationshipStorageInterface $relationshipStorage,
-        TagStorageInterface $modelsAtPath,
-        ArrayObject $classAtPath,
-        ModelStorageInterface $modelStorage,
-        $manyPath,
-        $manyToOneRel
+    protected function applyFilterToQuery(
+        ErrorCollection $errors,
+        QueryBuilder $builder,
+        CompositeExpression $link,
+        $table,
+        $field,
+        $operation,
+        $params = null
     ) {
-        // terms `one` and `many` refer to one <-> many database relationship type
-
-        $many           = $modelsAtPath->get($manyPath);
-        $manyClass      = $classAtPath[$manyPath];
-        $manyFk         = $this->getSchemaStorage()->getForeignKey($manyClass, $manyToOneRel);
-        list($oneClass) = $this->getSchemaStorage()->getReverseRelationship($manyClass, $manyToOneRel);
-
-        $onePath = empty($manyPath) === true ? $manyToOneRel : $manyPath . self::PATH_SEPARATOR . $manyToOneRel;
-
-        $getId = function () use ($many, $manyFk) {
-            foreach ($many as $item) {
-                yield $item->{$manyFk};
-            }
-        };
-
-        $this->buildBelongsToQuery($manyClass, $getId(), $manyToOneRel);
-        list ($query, $params) = $this->getBuilder()->get();
-
-        $handler = function (PDOStatement $statement) use (
-            $relationshipStorage,
-            $modelStorage,
-            $modelsAtPath,
-            $classAtPath,
-            $many,
-            $manyToOneRel,
-            $manyFk,
-            $oneClass,
-            $onePath
-        ) {
-            while (($oneModel = $statement->fetchObject($oneClass)) !== false) {
-                $modelsAtPath->register($modelStorage->register($oneModel), [$onePath]);
-            }
-            $classAtPath[$onePath] = $oneClass;
-
-            foreach ($many as $item) {
-                $oneId    = $item->{$manyFk};
-                $oneModel = $modelStorage->get($oneClass, $oneId);
-                $relationshipStorage->addToOneRelationship($item, $manyToOneRel, $oneModel);
-            }
-        };
-
-        return [$query, $params, $handler];
-    }
-
-    /**
-     * @param string    $className
-     * @param Generator $indexes
-     * @param string    $relationshipName
-     *
-     * @return void
-     */
-    protected function buildBelongsToQuery($className, Generator $indexes, $relationshipName)
-    {
-        list($oneClass) = $this->getSchemaStorage()->getReverseRelationship($className, $relationshipName);
-        $oneTable       = $this->getSchemaStorage()->getTable($oneClass);
-        $onePk          = $this->getSchemaStorage()->getPrimaryKey($oneClass);
-
-        $this->getBuilder()
-            ->forTable($oneTable)
-            ->select($this->getColumns($oneClass))
-            ->where($this->singleWhere($oneTable, $onePk, 'IN', $indexes));
-    }
-
-    /** @noinspection PhpTooManyParametersInspection
-     * @param RelationshipStorageInterface $relationshipStorage
-     * @param TagStorageInterface          $modelsAtPath
-     * @param ArrayObject                  $classAtPath
-     * @param ModelStorageInterface        $modelStorage
-     * @param string                       $oneIndex
-     * @param string                       $onePath
-     * @param string                       $oneToManyRel
-     * @param int|string|null              $offset
-     * @param int|string|null              $limit
-     *
-     * @return Closure
-     */
-    protected function createHasManyHandler(
-        RelationshipStorageInterface $relationshipStorage,
-        TagStorageInterface $modelsAtPath,
-        ArrayObject $classAtPath,
-        ModelStorageInterface $modelStorage,
-        $oneIndex,
-        $onePath,
-        $oneToManyRel,
-        $offset,
-        $limit
-    ) {
-        // terms `one` and `many` refer to one <-> many database relationship type
-
-        return function (PDOStatement $statement) use (
-            $relationshipStorage,
-            $modelStorage,
-            $modelsAtPath,
-            $classAtPath,
-            $oneIndex,
-            $onePath,
-            $oneToManyRel,
-            $offset,
-            $limit
-        ) {
-            $oneClass        = $classAtPath[$onePath];
-            $one             = $modelStorage->get($oneClass, $oneIndex);
-            list($manyClass) = $this->getSchemaStorage()->getReverseRelationship($oneClass, $oneToManyRel);
-
-            $manyPath = empty($onePath) === true ? $oneToManyRel : $onePath . self::PATH_SEPARATOR . $oneToManyRel;
-
-            $manyModels = [];
-            while (($manyModel = $statement->fetchObject($manyClass)) !== false) {
-                $manyModel    = $modelStorage->register($manyModel);
-                $manyModels[] = $manyModel;
-            }
-            $classAtPath[$manyPath] = $manyClass;
-            list($manyModels, $hasMore, $limit, $offset) = $this->normalizePagingParams($manyModels, $limit, $offset);
-            $relationshipStorage
-                ->addToManyRelationship($one, $oneToManyRel, $manyModels, $hasMore, $offset, $limit);
-            foreach ($manyModels as $manyModel) {
-                $modelsAtPath->register($manyModel, [$manyPath]);
-            }
-        };
-    }
-
-    /** @noinspection PhpTooManyParametersInspection
-     * @param RelationshipStorageInterface $relationshipStorage
-     * @param TagStorageInterface          $modelsAtPath
-     * @param ArrayObject                  $classAtPath
-     * @param ModelStorageInterface        $modelStorage
-     * @param string                       $onePath
-     * @param string                       $oneClass
-     * @param string                       $oneToManyRel
-     * @param int|string|null              $offset
-     * @param int|string|null              $limit
-     *
-     * @return array
-     */
-    protected function createHasManyQueriesAndHandlers(
-        RelationshipStorageInterface $relationshipStorage,
-        TagStorageInterface $modelsAtPath,
-        ArrayObject $classAtPath,
-        ModelStorageInterface $modelStorage,
-        $onePath,
-        $oneClass,
-        $oneToManyRel,
-        $offset,
-        $limit
-    ) {
-        // terms `one` and `many` refer to one <-> many database relationship type
-        list ($manyClass, $manyToOneRel) = $this->getSchemaStorage()->getReverseRelationship($oneClass, $oneToManyRel);
-        $onePk = $this->getSchemaStorage()->getPrimaryKey($oneClass);
-        $ones  = $modelsAtPath->get($onePath);
-
-        $queries    = [];
-        $handlers   = [];
-        $parameters = [];
-        foreach ($ones as $one) {
-            $oneIndex  = $one->{$onePk};
-
-            // TODO optimize. All queries are the same. Only params differ. Prepare and then bound params.
-            $this->buildHasManyQuery($manyClass, $oneIndex, $manyToOneRel, $offset, $limit);
-            list($query, $params) = $this->getBuilder()->get();
-
-            $queries[]    = $query;
-            $parameters[] = $params;
-            $handlers[]   = $this->createHasManyHandler(
-                $relationshipStorage,
-                $modelsAtPath,
-                $classAtPath,
-                $modelStorage,
-                $oneIndex,
-                $onePath,
-                $oneToManyRel,
-                $offset,
-                $limit
-            );
-        }
-
-        return [$queries, $parameters, $handlers];
-    }
-
-    /**
-     * @param string          $className
-     * @param string|int      $index
-     * @param string          $relationshipName
-     * @param int|string|null $offset
-     * @param int|string|null $limit
-     */
-    protected function buildHasManyQuery($className, $index, $relationshipName, $offset, $limit)
-    {
-        $tableName  = $this->getSchemaStorage()->getTable($className);
-        $foreignKey = $this->getSchemaStorage()->getForeignKey($className, $relationshipName);
-
-        $this->getBuilder()
-            ->forTable($tableName)
-            ->select($this->getColumns($className))
-            ->where($this->singleWhere($tableName, $foreignKey, '=', $index))
-            ->limit($limit, $offset);
-    }
-
-    /** @noinspection PhpTooManyParametersInspection
-     * @param RelationshipStorageInterface $relationshipStorage
-     * @param TagStorageInterface          $modelsAtPath
-     * @param ArrayObject                  $classAtPath
-     * @param ModelStorageInterface        $modelStorage
-     * @param string                       $primaryPath
-     * @param string                       $primaryClass
-     * @param string                       $primaryToReverseRel
-     * @param int|string|null              $offset
-     * @param int|string|null              $limit
-     *
-     * @return array
-     */
-    protected function createBelongsToManyQueriesAndHandlers(
-        RelationshipStorageInterface $relationshipStorage,
-        TagStorageInterface $modelsAtPath,
-        ArrayObject $classAtPath,
-        ModelStorageInterface $modelStorage,
-        $primaryPath,
-        $primaryClass,
-        $primaryToReverseRel,
-        $offset,
-        $limit
-    ) {
-        list ($reverseClass) = $this->getSchemaStorage()->getReverseRelationship($primaryClass, $primaryToReverseRel);
-        $primaryKey   = $this->getSchemaStorage()->getPrimaryKey($primaryClass);
-
-        $queries    = [];
-        $parameters = [];
-        $handlers   = [];
-        $primaryModels = $modelsAtPath->get($primaryPath);
-        foreach ($primaryModels as $primaryModel) {
-            $index  = $primaryModel->{$primaryKey};
-            $this->buildBelongsToManyQuery($primaryClass, $index, $primaryToReverseRel, $offset, $limit);
-            list ($query, $params) = $this->getBuilder()->get();
-
-            $queries[]    = $query;
-            $parameters[] = $params;
-            $handlers[]   = $this->createBelongsManyHandler(
-                $relationshipStorage,
-                $modelsAtPath,
-                $classAtPath,
-                $modelStorage,
-                $primaryModel,
-                $primaryPath,
-                $primaryToReverseRel,
-                $reverseClass,
-                $offset,
-                $limit
-            );
-        }
-
-        return [$queries, $parameters, $handlers];
-    }
-
-    /**
-     * @param string     $className
-     * @param string|int $index
-     * @param string     $relationshipName
-     * @param string|int $offset
-     * @param string|int $limit
-     */
-    protected function buildBelongsToManyQuery($className, $index, $relationshipName, $offset, $limit)
-    {
-        list ($intermediateTable, $foreignKey, $reverseForeignKey) =
-            $this->getSchemaStorage()->getBelongsToManyRelationship($className, $relationshipName);
-        list ($reverseClass) = $this->getSchemaStorage()->getReverseRelationship($className, $relationshipName);
-        $reverseTable = $this->getSchemaStorage()->getTable($reverseClass);
-        $reversePk    = $this->getSchemaStorage()->getPrimaryKey($reverseClass);
-
-        $get = function (array $value) {
-            yield $value;
-        };
-
-        $this->getBuilder()
-            ->forTable($reverseTable)
-            ->select($this->getColumns($reverseClass))
-            ->join($get([$reverseTable, $reversePk, $intermediateTable, $reverseForeignKey]))
-            ->where($this->singleWhere($intermediateTable, $foreignKey, '=', $index))
-            ->limit($limit, $offset);
-    }
-
-    /** @noinspection PhpTooManyParametersInspection
-     * @param RelationshipStorageInterface $relationshipStorage
-     * @param TagStorageInterface          $modelsAtPath
-     * @param ArrayObject                  $classAtPath
-     * @param ModelStorageInterface        $modelStorage
-     * @param mixed                        $primaryModel
-     * @param string                       $primaryPath
-     * @param string                       $primaryToReverseRel
-     * @param string                       $reverseClass
-     * @param int|string|null              $offset
-     * @param int|string|null              $limit
-     *
-     * @return Closure
-     */
-    protected function createBelongsManyHandler(
-        RelationshipStorageInterface $relationshipStorage,
-        TagStorageInterface $modelsAtPath,
-        ArrayObject $classAtPath,
-        ModelStorageInterface $modelStorage,
-        $primaryModel,
-        $primaryPath,
-        $primaryToReverseRel,
-        $reverseClass,
-        $offset,
-        $limit
-    ) {
-        return function (PDOStatement $statement) use (
-            $relationshipStorage,
-            $modelsAtPath,
-            $classAtPath,
-            $modelStorage,
-            $primaryModel,
-            $primaryPath,
-            $primaryToReverseRel,
-            $reverseClass,
-            $offset,
-            $limit
-        ) {
-            $reversePath = empty($primaryPath) === true ? $primaryToReverseRel :
-                $primaryPath . self::PATH_SEPARATOR . $primaryToReverseRel;
-
-            $reverseModels = [];
-            while (($reverseModel = $statement->fetchObject($reverseClass)) !== false) {
-                $reverseModel    = $modelStorage->register($reverseModel);
-                $reverseModels[] = $reverseModel;
-            }
-            $classAtPath[$reversePath] = $reverseClass;
-
-            list($reverseModels, $hasMore, $limit, $offset) =
-                $this->normalizePagingParams($reverseModels, $limit, $offset);
-            $relationshipStorage
-                ->addToManyRelationship($primaryModel, $primaryToReverseRel, $reverseModels, $hasMore, $offset, $limit);
-            foreach ($reverseModels as $reverseModel) {
-                $modelsAtPath->register($reverseModel, [$reversePath]);
-            }
-        };
-    }
-
-    /**
-     * @param string     $tableName
-     * @param array|null $filterParams
-     */
-    protected function applyFiltersToQuery($tableName, array $filterParams = null)
-    {
-        if ($filterParams !== null) {
-            $wheres = function () use ($filterParams, $tableName) {
-                $ops = $this->getFilterOperations();
-                foreach ($filterParams as $field => $value) {
-                    if (is_string($value) === true || is_int($value) === true) {
-                        foreach ($ops->getDefaultOperation($tableName, $field, [$value]) as $operation) {
-                            yield $operation;
-                        }
-                    } elseif (is_array($value) === true) {
-                        foreach ($value as $operation => $params) {
-                            $normalizedParams = is_array($params) === true ? $params : [$params];
-                            if ($ops->hasOperation($operation) === false) {
-                                $msg = $this->getTranslator()->get(T::MSG_ERR_INVALID_FIELD);
-                                $this->getErrors()->addQueryParameterError($operation, $msg);
-                                continue;
-                            }
-                            $operations = $ops->getOperations($operation, $tableName, $field, $normalizedParams);
-                            foreach ($operations as $operation) {
-                                yield $operation;
-                            }
-                        }
-                    }
-                }
-            };
-            $this->getBuilder()->where($wheres());
+        switch ($operation) {
+            case '=':
+            case 'eq':
+            case 'equals':
+                $this->getFilterOperations()
+                    ->applyEquals($builder, $link, $errors, $table, $field, $params);
+                break;
+            case '!=':
+            case 'neq':
+            case 'not-equals':
+                $this->getFilterOperations()
+                    ->applyNotEquals($builder, $link, $errors, $table, $field, $params);
+                break;
+            case '<':
+            case 'lt':
+            case 'less-than':
+                $this->getFilterOperations()
+                    ->applyLessThan($builder, $link, $errors, $table, $field, $params);
+                break;
+            case '<=':
+            case 'lte':
+            case 'less-or-equals':
+                $this->getFilterOperations()
+                    ->applyLessOrEquals($builder, $link, $errors, $table, $field, $params);
+                break;
+            case '>':
+            case 'gt':
+            case 'greater-than':
+                $this->getFilterOperations()
+                    ->applyGreaterThan($builder, $link, $errors, $table, $field, $params);
+                break;
+            case '>=':
+            case 'gte':
+            case 'greater-or-equals':
+                $this->getFilterOperations()
+                    ->applyGreaterOrEquals($builder, $link, $errors, $table, $field, $params);
+                break;
+            case 'like':
+                $this->getFilterOperations()
+                    ->applyLike($builder, $link, $errors, $table, $field, $params);
+                break;
+            case 'not-like':
+                $this->getFilterOperations()
+                    ->applyNotLike($builder, $link, $errors, $table, $field, $params);
+                break;
+            case 'in':
+                $this->getFilterOperations()
+                    ->applyIn($builder, $link, $errors, $table, $field, (array)$params);
+                break;
+            case 'not-in':
+                $this->getFilterOperations()
+                    ->applyNotIn($builder, $link, $errors, $table, $field, (array)$params);
+                break;
+            case self::FILTER_OP_IS_NULL:
+                $this->getFilterOperations()->applyIsNull($builder, $link, $table, $field);
+                break;
+            case self::FILTER_OP_IS_NOT_NULL:
+                $this->getFilterOperations()->applyIsNotNull($builder, $link, $table, $field);
+                break;
+            default:
+                $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_OPERATION);
+                $errors->addQueryParameterError($field, $errMsg, $operation);
+                break;
         }
     }
 
     /**
-     * @param array|null $sortParams
+     * @param QueryBuilder $builder
+     * @param string       $table
+     * @param string       $column
+     * @param string       $bindName
      */
-    protected function applySortingToQuery(array $sortParams = null)
+    private function addWhereBind(QueryBuilder $builder, $table, $column, $bindName)
     {
-        if ($sortParams !== null) {
-            // TODO either replace input with Generator or get rid of generators in favour of arrays (other places too)
-            $getOrderByPairs = function () use ($sortParams) {
-                foreach ($sortParams as $column => $isAscending) {
-                    yield $column => $isAscending;
-                }
-            };
-            $this->getBuilder()->sort($getOrderByPairs());
-        }
+        $builder
+            ->andWhere($this->buildTableColumn($table, $column) . '=' . $bindName);
     }
 
     /**
      * @param string $table
      * @param string $column
-     * @param string $operation
-     * @param string $value
      *
-     * @return Generator
+     * @return string
      */
-    protected function singleWhere($table, $column, $operation, $value)
+    private function buildTableColumn($table, $column)
     {
-        yield [$table, $column, $operation, $value];
+        return "`$table`.`$column`";
     }
 
     /**
-     * @param string     $class
-     * @param string     $query
-     * @param array|null $parameters
-     *
-     * @return mixed
-     */
-    protected function querySingle($class, $query, array $parameters = null)
-    {
-        $statement = $this->getPdo()->prepare($query, [PDO::ATTR_CURSOR => PDO::CURSOR_FWDONLY]);
-        $statement->execute($parameters);
-        /** @noinspection PhpMethodParametersCountMismatchInspection */
-        $statement->setFetchMode(PDO::FETCH_CLASS|PDO::FETCH_PROPS_LATE, $class);
-
-        $result = $statement->fetch();
-
-        $statement->closeCursor();
-
-        return $result;
-    }
-
-    /**
-     * @param string     $class
-     * @param string     $query
-     * @param array|null $parameters
-     *
-     * @return array|false
-     */
-    protected function queryMultiple($class, $query, array $parameters = null)
-    {
-        // without this line PDO fails to assign parameters in LIMIT and OFFSET
-        $this->getPdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-
-        $statement = $this->getPdo()->prepare($query, [PDO::ATTR_CURSOR => PDO::CURSOR_FWDONLY]);
-        $statement->execute($parameters);
-        /** @noinspection PhpMethodParametersCountMismatchInspection */
-        $statement->setFetchMode(PDO::FETCH_CLASS|PDO::FETCH_PROPS_LATE, $class);
-
-        $result = $statement->fetchAll();
-
-        $statement->closeCursor();
-
-        return $result;
-    }
-
-    /**
-     * @param string     $query
-     * @param array|null $parameters
-     */
-    protected function execute($query, array $parameters = null)
-    {
-        // without this line PDO fails to assign parameters in LIMIT and OFFSET
-        $this->getPdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-
-        $this->getPdo()->prepare($query)->execute($parameters);
-    }
-
-    /**
-     * @param string[]  $queries
-     * @param array     $parameters
-     * @param Closure[] $handlers
-     *
-     * @return void
-     */
-    protected function execOneByOne(array $queries, array $parameters, array $handlers)
-    {
-        $counter = count($queries);
-        assert($counter . '===' . count($handlers), 'Size of queries and handlers must match');
-
-        for ($number = 0; $number < $counter; ++$number) {
-            $query   = $queries[$number];
-            $params  = $parameters[$number];
-            $handler = $handlers[$number];
-
-            // without this line PDO fails to assign parameters in LIMIT and OFFSET
-            $this->getPdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-
-            $statement = $this->getPdo()->prepare($query, [PDO::ATTR_CURSOR => PDO::CURSOR_FWDONLY]);
-            $statement->execute($params);
-            $handler($statement);
-
-            $statement->closeCursor();
-            unset($statement);
-        }
-    }
-
-    /**
-     * @param string[]  $queries
-     * @param array     $parameters
-     * @param Closure[] $handlers
-     *
-     * @return void
-     */
-    protected function execAllAtOnce(array $queries, array $parameters, array $handlers)
-    {
-        // TODO exec all at once still don't work with MySQL. It looks it's better to remove it.
-
-        $counter = count($queries);
-        assert($counter . '===' . count($handlers), 'Size of queries and handlers must match');
-
-        $query            = $this->getBuilder()->implode($queries);
-        $mergedParameters = [];
-        foreach ($parameters as $parameter) {
-            $mergedParameters = array_merge($mergedParameters, $parameter);
-        }
-
-//        $this->getPdo()->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-
-        $statement = $this->getPdo()->prepare($query, [PDO::ATTR_CURSOR => PDO::CURSOR_FWDONLY]);
-        $statement->execute($mergedParameters);
-
-        do {
-            /** @var Closure $curHandler */
-            $curHandler = current($handlers);
-            $curHandler($statement);
-        } while ($statement->nextRowset() === true && next($handlers) !== false);
-
-        $statement->closeCursor();
-        unset($statement);
-    }
-
-    /**
-     * @param array           $models
-     * @param int|string|null $offset
-     * @param int|string|null $limit
+     * @param string $modelClass
+     * @param string $relationshipName
      *
      * @return array
      */
-    private function normalizePagingParams(array $models, $limit, $offset)
+    private function createBelongsToBuilder($modelClass, $relationshipName)
     {
-        $hasMore = count($models) >= $limit;
-        $limit   = $hasMore === true ? $limit - 1 : null;
-        $offset  = $limit === null && $hasMore === false ? null : $offset;
-        $hasMore === false ?: array_pop($models);
+        list($oneClass) = $this->getModelSchemes()->getReverseRelationship($modelClass, $relationshipName);
+        $table         = $this->getTableName($modelClass);
+        $foreignKey    = $this->getModelSchemes()->getForeignKey($modelClass, $relationshipName);
+        $oneTable      = $this->getTableName($oneClass);
+        $onePrimaryKey = $this->getPrimaryKeyName($oneClass);
 
-        return [$models, $hasMore, $limit, $offset];
+        $builder = $this->getConnection()->createQueryBuilder();
+
+        $joinCondition = $this->buildTableColumn($table, $foreignKey) . '=' .
+            $this->buildTableColumn($oneTable, $onePrimaryKey);
+        $builder
+            ->select($this->getColumns($oneClass))
+            ->from($oneTable)
+            ->innerJoin($oneTable, $table, null, $joinCondition);
+
+        return [$builder, $oneClass, $this->getTableName($modelClass), $this->getPrimaryKeyName($modelClass)];
     }
 
     /**
-     * @return void
+     * @param string $modelClass
+     * @param string $relationshipName
+     *
+     * @return array
      */
-    private function resetErrors()
+    private function createHasManyBuilder($modelClass, $relationshipName)
     {
-        $this->errors = $this->factory->createErrorCollection();
+        list ($reverseClass, $reverseName) = $this->getModelSchemes()
+            ->getReverseRelationship($modelClass, $relationshipName);
+        $reverseTable = $this->getModelSchemes()->getTable($reverseClass);
+        $foreignKey   = $this->getModelSchemes()->getForeignKey($reverseClass, $reverseName);
+        $builder      = $this->getConnection()->createQueryBuilder();
+        $builder
+            ->select($this->getColumns($reverseClass))
+            ->from($reverseTable);
+
+        return [$builder, $reverseClass, $reverseTable, $foreignKey];
+    }
+
+    /**
+     * @param string $modelClass
+     * @param string $relationshipName
+     *
+     * @return array
+     */
+    private function createBelongsToManyBuilder($modelClass, $relationshipName)
+    {
+        list ($intermediateTable, $foreignKey, $reverseForeignKey) =
+            $this->getModelSchemes()->getBelongsToManyRelationship($modelClass, $relationshipName);
+        list ($reverseClass) =
+            $this->getModelSchemes()->getReverseRelationship($modelClass, $relationshipName);
+        $reverseTable = $this->getModelSchemes()->getTable($reverseClass);
+        $reversePk    = $this->getModelSchemes()->getPrimaryKey($reverseClass);
+
+        $joinCondition = $this->buildTableColumn($reverseTable, $reversePk) . '=' .
+            $this->buildTableColumn($intermediateTable, $reverseForeignKey);
+        $builder       = $this->getConnection()->createQueryBuilder();
+        $builder
+            ->select($this->getColumns($reverseClass))
+            ->from($reverseTable)
+            ->innerJoin($reverseTable, $intermediateTable, null, $joinCondition);
+
+        return [$builder, $reverseClass, $intermediateTable, $foreignKey];
     }
 }

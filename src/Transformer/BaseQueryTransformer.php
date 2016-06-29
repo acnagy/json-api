@@ -184,7 +184,7 @@ class BaseQueryTransformer extends BaseTransformer
                     $filters[$modelName] = $desc;
                     continue;
                 }
-                $errors->addQueryParameterError($jsonName, $this->messageInvalidItem());
+                $errors->addQueryParameterError($jsonName, $this->msgInvalidItem(), null, static::ERROR_STATUS_CODE);
             }
         }
 
@@ -208,7 +208,12 @@ class BaseQueryTransformer extends BaseTransformer
                     $sorts[$modelName] = $parameter->isAscending();
                     continue;
                 }
-                $errors->addQueryParameterError($parameter->getField(), $this->messageInvalidItem());
+                $errors->addQueryParameterError(
+                    $parameter->getField(),
+                    $this->msgInvalidItem(),
+                    null,
+                    static::ERROR_STATUS_CODE
+                );
             }
         }
 
@@ -235,7 +240,7 @@ class BaseQueryTransformer extends BaseTransformer
                     continue;
                 }
 
-                $errors->addQueryParameterError($includePath, $this->messageInvalidItem());
+                $errors->addQueryParameterError($includePath, $this->msgInvalidItem(), null, static::ERROR_STATUS_CODE);
             }
         }
 
@@ -256,7 +261,7 @@ class BaseQueryTransformer extends BaseTransformer
     /**
      * @return string
      */
-    private function messageInvalidItem()
+    private function msgInvalidItem()
     {
         return $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
     }

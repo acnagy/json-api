@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Contracts\Exceptions;
+<?php namespace Limoncello\Tests\JsonApi\Data\Api;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
+use Limoncello\Tests\JsonApi\Data\Models\Role;
+
 /**
- * @package Limoncello\JsonApi
+ * @package Limoncello\Tests
  */
-interface ExceptionInterface
+class RolesApi extends AppCrud
 {
-    // Exception marker. It is used in combination with built-in and custom exceptions to identify its origin.
+    const MODEL_CLASS = Role::class;
 }

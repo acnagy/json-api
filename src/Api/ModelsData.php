@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi;
+<?php namespace Limoncello\JsonApi\Api;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\ModelsDataInterface;
+use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
 

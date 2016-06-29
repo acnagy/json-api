@@ -16,33 +16,29 @@
  * limitations under the License.
  */
 
-use Limoncello\Tests\JsonApi\Data\Models\Emotion;
-use PDO;
+use Limoncello\Tests\JsonApi\Data\Models\Emotion as Model;
 
 /**
  * @package Limoncello\Tests\JsonApi
  */
 class EmotionsMigration extends Migration
 {
-    /**
-     * @inheritdoc
-     */
-    public function migrate(PDO $pdo)
-    {
-        $this->createTable($pdo, Emotion::TABLE_NAME, [
-            $this->primaryInt(Emotion::FIELD_ID),
-            $this->textUnique(Emotion::FIELD_NAME),
-            $this->date(Emotion::FIELD_CREATED_AT),
-            $this->date(Emotion::FIELD_UPDATED_AT),
-            $this->date(Emotion::FIELD_DELETED_AT),
-        ]);
-    }
+    /** @inheritdoc */
+    const MODEL_CLASS = Model::class;
 
     /**
      * @inheritdoc
      */
-    public function rollback(PDO $pdo)
+    public function migrate()
     {
-        $this->dropTable($pdo, Emotion::TABLE_NAME);
+        $this->createTable(Model::TABLE_NAME, [
+            $this->primaryInt(Model::FIELD_ID),
+            $this->string(Model::FIELD_NAME),
+            $this->datetime(Model::FIELD_CREATED_AT),
+            $this->nullableDatetime(Model::FIELD_UPDATED_AT),
+            $this->nullableDatetime(Model::FIELD_DELETED_AT),
+
+            $this->unique([Model::FIELD_NAME]),
+        ]);
     }
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use PDO;
+use Doctrine\DBAL\Schema\AbstractSchemaManager;
 
 /**
  * @package Limoncello\Tests\JsonApi
@@ -37,30 +37,30 @@ class Runner
     ];
 
     /**
-     * @param PDO $pdo
+     * @param AbstractSchemaManager $schemaManager
      *
      * @return void
      */
-    public function migrate(PDO $pdo)
+    public function migrate(AbstractSchemaManager $schemaManager)
     {
         foreach ($this->migrations as $class) {
             /** @var Migration $migration */
-            $migration = new $class();
-            $migration->migrate($pdo);
+            $migration = new $class($schemaManager);
+            $migration->migrate();
         }
     }
 
     /**
-     * @param PDO $pdo
+     * @param AbstractSchemaManager $schemaManager
      *
      * @return void
      */
-    public function rollback(PDO $pdo)
+    public function rollback(AbstractSchemaManager $schemaManager)
     {
         foreach (array_reverse($this->migrations, false) as $class) {
             /** @var Migration $migration */
-            $migration = new $class();
-            $migration->rollback($pdo);
+            $migration = new $class($schemaManager);
+            $migration->rollback();
         }
     }
 }

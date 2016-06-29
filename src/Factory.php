@@ -16,14 +16,16 @@
  * limitations under the License.
  */
 
+use Doctrine\DBAL\Connection;
 use Limoncello\JsonApi\Adapters\Repository;
+use Limoncello\JsonApi\Api\Crud;
+use Limoncello\JsonApi\Api\ModelsData;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\Document\TransformerInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
-use Limoncello\JsonApi\Contracts\QueryBuilderInterface;
 use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
 use Limoncello\JsonApi\Document\Parser;
 use Limoncello\JsonApi\Document\Resource;
@@ -43,10 +45,12 @@ use Neomerx\JsonApi\Contracts\Factories\FactoryInterface as JsonApiFactoryInterf
 use Neomerx\JsonApi\Encoder\EncoderOptions;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 use Neomerx\JsonApi\Factories\Factory as JsonApiFactory;
-use PDO;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.TooManyPublicMethods)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Factory implements FactoryInterface
 {
@@ -92,6 +96,8 @@ class Factory implements FactoryInterface
      * @param int|null $size
      *
      * @return PaginatedDataInterface
+     *
+     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
      */
     public function createPaginatedData(
         $data,
@@ -181,34 +187,25 @@ class Factory implements FactoryInterface
      * @inheritdoc
      */
     public function createRepository(
-        $class,
-        PDO $pdo,
+        Connection $connection,
         SchemaStorageInterface $schemaStorage,
-        QueryBuilderInterface $builder,
         FilterOperationsInterface $filterOperations,
-        PaginationStrategyInterface $relationshipPaging,
-        T $translator,
-        $isExecuteOnByOne = true
+        T $translator
     ) {
-        return new Repository(
-            $this,
-            $class,
-            $pdo,
-            $schemaStorage,
-            $builder,
-            $filterOperations,
-            $relationshipPaging,
-            $translator,
-            $isExecuteOnByOne
-        );
+        return new Repository($connection, $schemaStorage, $filterOperations, $translator);
     }
 
     /**
      * @inheritdoc
      */
-    public function createCrud(RepositoryInterface $repository)
-    {
-        return new Crud($repository, $this);
+    public function createCrud(
+        $modelClass,
+        RepositoryInterface $repository,
+        SchemaStorageInterface $modelSchemes,
+        PaginationStrategyInterface $paginationStrategy,
+        T $translator
+    ) {
+        return new Crud($this, $modelClass, $repository, $modelSchemes, $paginationStrategy, $translator);
     }
 
     /**

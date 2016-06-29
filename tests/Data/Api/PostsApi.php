@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Exceptions;
+<?php namespace Limoncello\Tests\JsonApi\Data\Api;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\Exceptions\ExceptionInterface;
+use Limoncello\Tests\JsonApi\Data\Models\Post;
 
 /**
- * @package Limoncello\JsonApi\I18n
+ * @package Limoncello\Tests
  */
-class LogicException extends \LogicException implements ExceptionInterface
+class PostsApi extends AppCrud
 {
+    const MODEL_CLASS = Post::class;
 }

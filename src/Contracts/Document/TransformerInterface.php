@@ -23,6 +23,22 @@ use Neomerx\JsonApi\Exceptions\ErrorCollection;
 interface TransformerInterface
 {
     /**
+     * Indicate transformations to start.
+     *
+     * @return void
+     */
+    public function transformationsToStart();
+
+    /**
+     * Indicate transformations completed.
+     *
+     * @param ErrorCollection $errors
+     *
+     * @return void
+     */
+    public function transformationsFinished(ErrorCollection $errors);
+
+    /**
      * @param string $type
      *
      * @return bool

@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Contracts;
+<?php namespace Limoncello\Tests\JsonApi\Data\Api;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,21 +16,12 @@
  * limitations under the License.
  */
 
-use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
+use Limoncello\Tests\JsonApi\Data\Models\Emotion;
 
 /**
- * @package Limoncello\JsonApi
+ * @package Limoncello\Tests
  */
-interface ModelsDataInterface
+class EmotionsApi extends AppCrud
 {
-    /**
-     * @return PaginatedDataInterface
-     */
-    public function getPaginatedData();
-
-    /**
-     * @return RelationshipStorageInterface|null
-     */
-    public function getRelationshipStorage();
+    const MODEL_CLASS = Emotion::class;
 }

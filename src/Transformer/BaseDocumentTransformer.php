@@ -16,13 +16,15 @@
  * limitations under the License.
  */
 
+use Interop\Container\ContainerInterface;
 use Limoncello\JsonApi\Contracts\Document\ResourceIdentifierInterface;
 use Limoncello\JsonApi\Contracts\Document\TransformerInterface;
+use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
+use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
+use Limoncello\Models\Contracts\SchemaStorageInterface as ModelSchemesInterface;
 use Limoncello\Models\RelationshipTypes;
-use Neomerx\JsonApi\Contracts\Schema\ContainerInterface;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
@@ -47,21 +49,30 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
     private $mappings;
 
     /**
-     * @var ContainerInterface
+     * @var JsonSchemesInterface
      */
     private $jsonSchemes;
 
     /**
-     * @param ContainerInterface     $jsonSchemes
-     * @param SchemaStorageInterface $modelSchemes
-     * @param T                      $translator
+     * @var ContainerInterface
      */
-    public function __construct(ContainerInterface $jsonSchemes, SchemaStorageInterface $modelSchemes, T $translator)
-    {
-        parent::__construct($modelSchemes);
+    private $container;
 
-        $this->jsonSchemes  = $jsonSchemes;
-        $this->translator   = $translator;
+    /**
+     * BaseDocumentTransformer constructor.
+     *
+     * @param ContainerInterface $container
+     */
+    public function __construct(ContainerInterface $container)
+    {
+        $this->container = $container;
+
+        parent::__construct($container->get(ModelSchemesInterface::class));
+
+        /** @var FactoryInterface $factory */
+        $factory           = $container->get(FactoryInterface::class);
+        $this->translator  = $factory->createTranslator();
+        $this->jsonSchemes = $container->get(JsonSchemesInterface::class);
 
         $schemaClassName = static::SCHEMA_CLASS;
 
@@ -90,12 +101,12 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
         $transformed = [];
         foreach ($jsonAttributes as $jsonAttr => $value) {
             if ($this->canMapAttribute($jsonAttr) === true) {
-                $modelField = $this->mapAttribute($jsonAttr);
+                $modelField               = $this->mapAttribute($jsonAttr);
                 $transformed[$modelField] = $value;
                 continue;
             }
             $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
-            $errors->addDataAttributeError($jsonAttr, $errMsg);
+            $errors->addDataAttributeError($jsonAttr, $errMsg, null, static::ERROR_STATUS_CODE);
         }
 
         return $transformed;
@@ -118,7 +129,9 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
         if ($identifier !== null) {
             // check received relationship type is valid
             if ($this->getExpectedResourceType($modelName) !== $identifier->getType()) {
-                $errors->addRelationshipTypeError($jsonName, $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT));
+                $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
+                $errors->addRelationshipTypeError($jsonName, $errMsg, null, static::ERROR_STATUS_CODE);
+
                 return null;
             }
             $index = $identifier->getId();
@@ -143,7 +156,9 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
             /** @var ResourceIdentifierInterface $identifier */
             // check received relationship type is valid
             if ($expectedType !== $identifier->getType()) {
-                $errors->addRelationshipTypeError($jsonName, $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT));
+                $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
+                $errors->addRelationshipTypeError($jsonName, $errMsg, null, static::ERROR_STATUS_CODE);
+
                 return null;
             }
             $indexes[] = $identifier->getId();
@@ -161,6 +176,14 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
     }
 
     /**
+     * @return ContainerInterface
+     */
+    protected function getContainer()
+    {
+        return $this->container;
+    }
+
+    /**
      * @return array
      */
     protected function getMappings()
@@ -169,7 +192,7 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
     }
 
     /**
-     * @return ContainerInterface
+     * @return JsonSchemesInterface
      */
     protected function getJsonSchemes()
     {
@@ -195,6 +218,7 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
     {
         if ($this->canMapRelationship($jsonName) === false) {
             $errors->addRelationshipError($jsonName, $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT));
+
             return null;
         }
 
@@ -202,7 +226,9 @@ abstract class BaseDocumentTransformer extends BaseTransformer implements Transf
 
         $relType = $this->getModelSchemes()->getRelationshipType($this->getModelClass(), $modelName);
         if ($relType !== $expectedRelType) {
-            $errors->addRelationshipError($jsonName, $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT));
+            $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
+            $errors->addRelationshipError($jsonName, $errMsg, null, static::ERROR_STATUS_CODE);
+
             return null;
         }
 
