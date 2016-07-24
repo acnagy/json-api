@@ -42,4 +42,18 @@ interface SchemaInterface extends SchemaProviderInterface
      * @return array
      */
     public static function getMappings();
+
+    /**
+     * @param string $jsonName
+     *
+     * @return string
+     */
+    public static function getAttributeMapping($jsonName);
+
+    /**
+     * @param string $jsonName
+     *
+     * @return string
+     */
+    public static function getRelationshipMapping($jsonName);
 }

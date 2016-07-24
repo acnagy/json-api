@@ -17,8 +17,6 @@
  */
 
 use Interop\Container\ContainerInterface;
-use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
-use Neomerx\JsonApi\Contracts\Http\ResponsesInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -88,15 +86,26 @@ interface ControllerInterface
     public static function delete(array $routeParams, ContainerInterface $container, ServerRequestInterface $request);
 
     /**
-     * @param ContainerInterface               $container
-     * @param ServerRequestInterface           $request
-     * @param EncodingParametersInterface|null $parameters
+     * @param ContainerInterface     $container
+     * @param ServerRequestInterface $request
      *
-     * @return ResponsesInterface
+     * @return array
      */
-    public static function createResponses(
+    public static function parseInputOnCreate(
         ContainerInterface $container,
-        ServerRequestInterface $request,
-        EncodingParametersInterface $parameters = null
+        ServerRequestInterface $request
+    );
+
+    /**
+     * @param string|int             $index
+     * @param ContainerInterface     $container
+     * @param ServerRequestInterface $request
+     *
+     * @return array
+     */
+    public static function parseInputOnUpdate(
+        $index,
+        ContainerInterface $container,
+        ServerRequestInterface $request
     );
 }

@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Contracts\Document;
+<?php namespace Limoncello\JsonApi\Contracts\Http\Query;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,22 +16,33 @@
  * limitations under the License.
  */
 
-use Neomerx\JsonApi\Exceptions\ErrorCollection;
-
 /**
  * @package Limoncello\JsonApi
  */
-interface ParserInterface
+interface FilterParameterInterface
 {
     /**
-     * @param string $json
-     *
-     * @return ResourceInterface|null
+     * @return string
      */
-    public function parse($json);
+    public function getName();
 
     /**
-     * @return ErrorCollection
+     * @return string
      */
-    public function getErrors();
+    public function getOriginalName();
+
+    /**
+     * @return mixed
+     */
+    public function getValue();
+
+    /**
+     * @return boolean
+     */
+    public function isIsRelationship();
+
+    /**
+     * @return int|null
+     */
+    public function getRelationshipType();
 }

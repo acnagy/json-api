@@ -24,9 +24,9 @@ use Generator;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\Api\CrudInterface;
-use Limoncello\JsonApi\Contracts\Document\ResourceInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
-use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
+use Limoncello\JsonApi\Contracts\Http\Query\IncludeParameterInterface;
+use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
 use Limoncello\Models\Contracts\ModelStorageInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
@@ -80,39 +80,31 @@ class Crud implements CrudInterface
     private $paginationStrategy;
 
     /**
-     * @var T
-     */
-    private $translator;
-
-    /**
      * @param FactoryInterface            $factory
      * @param string                      $modelClass
      * @param RepositoryInterface         $repository
      * @param SchemaStorageInterface      $modelSchemes
      * @param PaginationStrategyInterface $paginationStrategy
-     * @param T                           $translator
      */
     public function __construct(
         FactoryInterface $factory,
         $modelClass,
         RepositoryInterface $repository,
         SchemaStorageInterface $modelSchemes,
-        PaginationStrategyInterface $paginationStrategy,
-        T $translator
+        PaginationStrategyInterface $paginationStrategy
     ) {
         $this->factory            = $factory;
         $this->modelClass         = $modelClass;
         $this->repository         = $repository;
         $this->modelSchemes       = $modelSchemes;
         $this->paginationStrategy = $paginationStrategy;
-        $this->translator         = $translator;
     }
 
     /**
      * @inheritdoc
      */
     public function index(
-        array $filterParams = null,
+        FilterParameterCollection $filterParams = null,
         array $sortParams = null,
         array $includePaths = null,
         array $pagingParams = null
@@ -144,7 +136,7 @@ class Crud implements CrudInterface
     /**
      * @inheritdoc
      */
-    public function read($index, array $filterParams = null, array $includePaths = null)
+    public function read($index, FilterParameterCollection $filterParams = null, array $includePaths = null)
     {
         $modelClass = $this->getModelClass();
 
@@ -176,7 +168,7 @@ class Crud implements CrudInterface
     public function readRelationship(
         $index,
         $name,
-        array $filterParams = null,
+        FilterParameterCollection $filterParams = null,
         array $sortParams = null,
         array $pagingParams = null
     ) {
@@ -199,9 +191,10 @@ class Crud implements CrudInterface
         if ($isCollection == true) {
             list($offset, $limit) = $this->getPaginationStrategy()->parseParameters($pagingParams);
             $builder->setFirstResult($offset)->setMaxResults($limit);
-            $data = $this->fetchCollectionData($builder, $resultClass, $limit, $offset);
+            $data = $this
+                ->fetchCollectionData($this->builderOnReadRelationship($builder), $resultClass, $limit, $offset);
         } else {
-            $data = $this->fetchSingleData($builder, $resultClass);
+            $data = $this->fetchSingleData($this->builderOnReadRelationship($builder), $resultClass);
         }
 
         return $data;
@@ -220,38 +213,25 @@ class Crud implements CrudInterface
     /**
      * @inheritdoc
      */
-    public function create(ResourceInterface $resource)
+    public function create(array $attributes, array $toMany = [])
     {
         $modelClass = $this->getModelClass();
-
-        $attributes = $resource->getAttributes();
-
-        if (($identity = $resource->getId()) !== null) {
-            $primaryKey              = $this->getModelSchemes()->getPrimaryKey($modelClass);
-            $attributes[$primaryKey] = $identity;
-        }
-
-        foreach ($resource->getToOneRelationships() as $name => $value) {
-            $foreignKey              = $this->getModelSchemes()->getForeignKey($modelClass, $name);
-            $attributes[$foreignKey] = $value;
-        }
 
         $allowedChanges = $this->filterAttributesOnCreate($modelClass, $attributes);
 
         $index    = null;
-        $toMany   = $resource->getToManyRelationships();
         $saveMain = $this->getRepository()->create($modelClass, $allowedChanges);
         $saveMain = $this->builderSaveResourceOnCreate($saveMain);
         $saveMain->getSQL(); // prepare
         $this->inTransaction(function () use ($modelClass, $saveMain, $toMany, &$index) {
             $saveMain->execute();
-            $index    = $saveMain->getConnection()->lastInsertId();
+            $index = $saveMain->getConnection()->lastInsertId();
             foreach ($toMany as $name => $values) {
                 $indexBind      = ':index';
                 $otherIndexBind = ':otherIndex';
                 $saveToMany     = $this->getRepository()
                     ->createToManyRelationship($modelClass, $indexBind, $name, $otherIndexBind);
-                $saveToMany     = $this->builderSaveRelationshipOnCreate($saveToMany);
+                $saveToMany     = $this->builderSaveRelationshipOnCreate($name, $saveToMany);
                 $saveToMany->setParameter($indexBind, $index);
                 foreach ($values as $value) {
                     $saveToMany->setParameter($otherIndexBind, $value)->execute();
@@ -265,20 +245,12 @@ class Crud implements CrudInterface
     /**
      * @inheritdoc
      */
-    public function update($index, ResourceInterface $resource)
+    public function update($index, array $attributes, array $toMany = [])
     {
         $modelClass = $this->getModelClass();
 
-        $attributes = $resource->getAttributes();
-
-        foreach ($resource->getToOneRelationships() as $name => $value) {
-            $foreignKey              = $this->getModelSchemes()->getForeignKey($modelClass, $name);
-            $attributes[$foreignKey] = $value;
-        }
-
         $allowedChanges = $this->filterAttributesOnUpdate($modelClass, $attributes);
 
-        $toMany   = $resource->getToManyRelationships();
         $saveMain = $this->getRepository()->update($modelClass, $index, $allowedChanges);
         $saveMain = $this->builderSaveResourceOnUpdate($saveMain);
         $saveMain->getSQL(); // prepare
@@ -289,12 +261,12 @@ class Crud implements CrudInterface
                 $otherIndexBind = ':otherIndex';
 
                 $cleanToMany = $this->getRepository()->cleanToManyRelationship($modelClass, $indexBind, $name);
-                $cleanToMany = $this->builderCleanRelationshipOnUpdate($cleanToMany);
+                $cleanToMany = $this->builderCleanRelationshipOnUpdate($name, $cleanToMany);
                 $cleanToMany->setParameter($indexBind, $index)->execute();
 
                 $saveToMany = $this->getRepository()
                     ->createToManyRelationship($modelClass, $indexBind, $name, $otherIndexBind);
-                $saveToMany = $this->builderSaveRelationshipOnUpdate($saveToMany);
+                $saveToMany = $this->builderSaveRelationshipOnUpdate($name, $saveToMany);
                 $saveToMany->setParameter($indexBind, $index);
                 foreach ($values as $value) {
                     $saveToMany->setParameter($otherIndexBind, $value)->execute();
@@ -341,14 +313,6 @@ class Crud implements CrudInterface
     protected function getPaginationStrategy()
     {
         return $this->paginationStrategy;
-    }
-
-    /**
-     * @return T
-     */
-    protected function getTranslator()
-    {
-        return $this->translator;
     }
 
     /**
@@ -431,12 +395,12 @@ class Crud implements CrudInterface
     }
 
     /**
-     * @param $modelClass
-     * @param $attributes
+     * @param string $modelClass
+     * @param array  $attributes
      *
      * @return array
      */
-    protected function filterAttributesOnCreate($modelClass, $attributes)
+    protected function filterAttributesOnCreate($modelClass, array $attributes)
     {
         $allowedAttributes = array_flip($this->getModelSchemes()->getAttributes($modelClass));
         $allowedChanges    = array_intersect_key($attributes, $allowedAttributes);
@@ -445,12 +409,12 @@ class Crud implements CrudInterface
     }
 
     /**
-     * @param $modelClass
-     * @param $attributes
+     * @param string $modelClass
+     * @param array  $attributes
      *
      * @return array
      */
-    protected function filterAttributesOnUpdate($modelClass, $attributes)
+    protected function filterAttributesOnUpdate($modelClass, array $attributes)
     {
         $allowedAttributes = array_flip($this->getModelSchemes()->getAttributes($modelClass));
         $allowedChanges    = array_intersect_key($attributes, $allowedAttributes);
@@ -483,6 +447,16 @@ class Crud implements CrudInterface
      *
      * @return QueryBuilder
      */
+    protected function builderOnReadRelationship(QueryBuilder $builder)
+    {
+        return $builder;
+    }
+
+    /**
+     * @param QueryBuilder $builder
+     *
+     * @return QueryBuilder
+     */
     protected function builderSaveResourceOnCreate(QueryBuilder $builder)
     {
         return $builder;
@@ -499,32 +473,44 @@ class Crud implements CrudInterface
     }
 
     /**
+     * @param string       $relationshipName
      * @param QueryBuilder $builder
      *
      * @return QueryBuilder
      */
-    protected function builderSaveRelationshipOnCreate(QueryBuilder $builder)
+    protected function builderSaveRelationshipOnCreate($relationshipName, QueryBuilder $builder)
     {
+        // suppress unused warning
+        $relationshipName ?: null;
+
         return $builder;
     }
 
     /**
+     * @param string       $relationshipName
      * @param QueryBuilder $builder
      *
      * @return QueryBuilder
      */
-    protected function builderSaveRelationshipOnUpdate(QueryBuilder $builder)
+    protected function builderSaveRelationshipOnUpdate($relationshipName, QueryBuilder $builder)
     {
+        // suppress unused warning
+        $relationshipName ?: null;
+
         return $builder;
     }
 
     /**
+     * @param string       $relationshipName
      * @param QueryBuilder $builder
      *
      * @return QueryBuilder
      */
-    protected function builderCleanRelationshipOnUpdate(QueryBuilder $builder)
+    protected function builderCleanRelationshipOnUpdate($relationshipName, QueryBuilder $builder)
     {
+        // suppress unused warning
+        $relationshipName ?: null;
+
         return $builder;
     }
 
@@ -558,8 +544,8 @@ class Crud implements CrudInterface
     }
 
     /**
-     * @param PaginatedDataInterface $data
-     * @param array                  $paths
+     * @param PaginatedDataInterface      $data
+     * @param IncludeParameterInterface[] $paths
      *
      * @return RelationshipStorageInterface
      *
@@ -605,7 +591,7 @@ class Crud implements CrudInterface
     }
 
     /**
-     * @param array $paths
+     * @param IncludeParameterInterface[] $paths
      *
      * @return Generator
      */
@@ -620,7 +606,7 @@ class Crud implements CrudInterface
         foreach ($paths as $path) {
             $parentDepth = 0;
             $tmpPath     = static::$rootPath;
-            foreach (explode(static::$pathSeparator, $path) as $pathPiece) {
+            foreach ($path->getPath() as $pathPiece) {
                 $parent                    = $tmpPath;
                 $tmpPath                   = empty($tmpPath) === true ?
                     $pathPiece : $tmpPath . static::$pathSeparator . $pathPiece;
@@ -675,13 +661,6 @@ class Crud implements CrudInterface
 
         foreach ($childRelationships as $name) {
             $childrenPath = $parentsPath !== static::$rootPath ? $parentsPath . static::$pathSeparator . $name : $name;
-
-            if ($this->getModelSchemes()->hasRelationship($parentClass, $name) === false) {
-                $errors = $this->getFactory()->createErrorCollection();
-                $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_PARAMETER);
-                $errors->addQueryParameterError($name, $errMsg, $childrenPath);
-                $this->checkErrors($errors);
-            }
 
             /** @var QueryBuilder $builder */
             list ($builder, $class, $relationshipType) =

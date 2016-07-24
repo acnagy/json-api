@@ -16,12 +16,15 @@
  * limitations under the License.
  */
 
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\DriverManager;
 use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
 use Limoncello\JsonApi\Factory;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
 use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Models\RelationshipTypes;
 use Limoncello\Models\SchemaStorage;
+use Limoncello\Tests\JsonApi\Data\Migrations\Runner as MigrationRunner;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
@@ -35,6 +38,7 @@ use Limoncello\Tests\JsonApi\Data\Schemes\EmotionSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\RoleSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\UserSchema;
+use Limoncello\Tests\JsonApi\Data\Seeds\Runner as SeedRunner;
 use Mockery;
 use Neomerx\JsonApi\Contracts\Factories\FactoryInterface;
 
@@ -47,6 +51,37 @@ class TestCase extends \PHPUnit_Framework_TestCase
     {
         parent::tearDown();
         Mockery::close();
+    }
+
+    /**
+     * @return Connection
+     */
+    protected function createConnection()
+    {
+        $connection = DriverManager::getConnection(['url' => 'sqlite:///', 'memory' => true]);
+        $this->assertNotSame(false, $connection->exec('PRAGMA foreign_keys = ON;'));
+
+        return $connection;
+    }
+
+    /**
+     * @param Connection $connection
+     */
+    protected function migrateDatabase(Connection $connection)
+    {
+        (new MigrationRunner())->migrate($connection->getSchemaManager());
+        (new SeedRunner())->run($connection);
+    }
+
+    /**
+     * @return Connection
+     */
+    protected function initDb()
+    {
+        $connection = $this->createConnection();
+        $this->migrateDatabase($connection);
+
+        return $connection;
     }
 
     /**
@@ -123,7 +158,19 @@ class TestCase extends \PHPUnit_Framework_TestCase
         RelationshipStorageInterface $storage = null
     ) {
         $factory = new Factory();
-        $schemes = $factory->createContainer([
+        $schemes = $factory->createContainer($this->getSchemeMap(), $modelSchemes);
+
+        $storage === null ?: $schemes->setRelationshipStorage($storage);
+
+        return $schemes;
+    }
+
+    /**
+     * @return array
+     */
+    protected function getSchemeMap()
+    {
+        return [
             Board::class   => function (
                 FactoryInterface $factory,
                 ContainerInterface $container,
@@ -136,10 +183,6 @@ class TestCase extends \PHPUnit_Framework_TestCase
             Post::class    => PostSchema::class,
             Role::class    => RoleSchema::class,
             User::class    => UserSchema::class,
-        ], $modelSchemes);
-
-        $storage === null ?: $schemes->setRelationshipStorage($storage);
-
-        return $schemes;
+        ];
     }
 }

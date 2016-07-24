@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\Document\ResourceInterface;
+use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 
 /**
@@ -25,28 +25,28 @@ use Limoncello\Models\Contracts\PaginatedDataInterface;
 interface CrudInterface
 {
     /**
-     * @param array|null $filterParams
-     * @param array|null $sortParams
-     * @param array|null $includePaths
-     * @param array|null $pagingParams
+     * @param FilterParameterCollection|null $filterParams
+     * @param array|null                     $sortParams
+     * @param array|null                     $includePaths
+     * @param array|null                     $pagingParams
      *
      * @return ModelsDataInterface
      */
     public function index(
-        array $filterParams = null,
+        FilterParameterCollection $filterParams = null,
         array $sortParams = null,
         array $includePaths = null,
         array $pagingParams = null
     );
 
     /**
-     * @param int|string $index
-     * @param array|null $filterParams
-     * @param array|null $includePaths
+     * @param int|string                     $index
+     * @param FilterParameterCollection|null $filterParams
+     * @param array|null                     $includePaths
      *
      * @return ModelsDataInterface
      */
-    public function read($index, array $filterParams = null, array $includePaths = null);
+    public function read($index, FilterParameterCollection $filterParams = null, array $includePaths = null);
 
     /**
      * @param int|string $index
@@ -56,33 +56,35 @@ interface CrudInterface
     public function delete($index);
 
     /**
-     * @param ResourceInterface $resource
+     * @param array $attributes
+     * @param array $toMany
      *
      * @return string
      */
-    public function create(ResourceInterface $resource);
-
-    /**
-     * @param int|string        $index
-     * @param ResourceInterface $resource
-     *
-     * @return void
-     */
-    public function update($index, ResourceInterface $resource);
+    public function create(array $attributes, array $toMany = []);
 
     /**
      * @param int|string $index
-     * @param string     $relationshipName
-     * @param array|null $filterParams
-     * @param array|null $sortParams
-     * @param array|null $pagingParams
+     * @param array      $attributes
+     * @param array      $toMany
+     *
+     * @return void
+     */
+    public function update($index, array $attributes, array $toMany = []);
+
+    /**
+     * @param int|string                     $index
+     * @param string                         $relationshipName
+     * @param FilterParameterCollection|null $filterParams
+     * @param array|null                     $sortParams
+     * @param array|null                     $pagingParams
      *
      * @return PaginatedDataInterface
      */
     public function readRelationship(
         $index,
         $relationshipName,
-        array $filterParams = null,
+        FilterParameterCollection $filterParams = null,
         array $sortParams = null,
         array $pagingParams = null
     );

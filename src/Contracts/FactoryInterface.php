@@ -18,14 +18,8 @@
 
 use Doctrine\DBAL\Connection;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
-use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
-use Limoncello\JsonApi\Contracts\Api\CrudInterface;
 use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
-use Limoncello\JsonApi\Contracts\Document\ParserInterface;
-use Limoncello\JsonApi\Contracts\Document\ResourceIdentifierInterface;
-use Limoncello\JsonApi\Contracts\Document\ResourceInterface;
-use Limoncello\JsonApi\Contracts\Document\TransformerInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface;
 use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
@@ -77,33 +71,6 @@ interface FactoryInterface extends ModelsFactoryInterface
     );
 
     /**
-     * @param string          $type
-     * @param int|null|string $index
-     *
-     * @return ResourceIdentifierInterface
-     */
-    public function createResourceIdentifier($type, $index);
-
-    /**
-     * @param string          $type
-     * @param int|null|string $index
-     * @param array           $attributes
-     * @param array           $toOne
-     * @param array           $toMany
-     *
-     * @return ResourceInterface
-     */
-    public function createResource($type, $index, array $attributes, array $toOne, array $toMany);
-
-    /**
-     * @param TransformerInterface $transformer
-     * @param TranslatorInterface  $translator
-     *
-     * @return ParserInterface
-     */
-    public function createParser(TransformerInterface $transformer, TranslatorInterface $translator);
-
-    /**
      * @return TranslatorInterface
      */
     public function createTranslator();
@@ -120,23 +87,6 @@ interface FactoryInterface extends ModelsFactoryInterface
         Connection $connection,
         SchemaStorageInterface $schemaStorage,
         FilterOperationsInterface $filterOperations,
-        TranslatorInterface $translator
-    );
-
-    /**
-     * @param string                      $modelClass
-     * @param RepositoryInterface         $repository
-     * @param SchemaStorageInterface      $modelSchemes
-     * @param PaginationStrategyInterface $paginationStrategy
-     * @param TranslatorInterface         $translator
-     *
-     * @return CrudInterface
-     */
-    public function createCrud(
-        $modelClass,
-        RepositoryInterface $repository,
-        SchemaStorageInterface $modelSchemes,
-        PaginationStrategyInterface $paginationStrategy,
         TranslatorInterface $translator
     );
 

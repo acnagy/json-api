@@ -61,6 +61,22 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
     /**
      * @inheritdoc
      */
+    public static function getAttributeMapping($jsonName)
+    {
+        return static::getMappings()[static::SCHEMA_ATTRIBUTES][$jsonName];
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public static function getRelationshipMapping($jsonName)
+    {
+        return static::getMappings()[static::SCHEMA_RELATIONSHIPS][$jsonName];
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function getAttributes($model)
     {
         $attributes = [];
@@ -159,8 +175,8 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
                 PaginationStrategyInterface::PARAM_PAGING_SKIP => $offset,
                 PaginationStrategyInterface::PARAM_PAGING_SIZE => $data->getSize(),
             ];
-
             $fullUrl = $uri . '?' . http_build_query($paramsWithPaging);
+
             return $fullUrl;
         };
 

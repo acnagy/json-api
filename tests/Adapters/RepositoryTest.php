@@ -17,20 +17,25 @@
  */
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Limoncello\JsonApi\Adapters\FilterOperations;
 use Limoncello\JsonApi\Adapters\Repository;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
+use Limoncello\JsonApi\Contracts\Http\Query\SortParameterInterface;
+use Limoncello\JsonApi\Http\Query\FilterParameter;
+use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
+use Limoncello\JsonApi\Http\Query\SortParameter;
 use Limoncello\JsonApi\I18n\Translator;
 use Limoncello\Models\RelationshipTypes;
-use Limoncello\Tests\JsonApi\Data\Migrations\Runner as MigrationRunner;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
 use Limoncello\Tests\JsonApi\Data\Models\Post;
-use Limoncello\Tests\JsonApi\Data\Seeds\Runner as SeedRunner;
+use Limoncello\Tests\JsonApi\Data\Schemes\BoardSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\EmotionSchema;
 use Limoncello\Tests\JsonApi\TestCase;
+use Neomerx\JsonApi\Encoder\Parameters\SortParameter as JsonLibrarySortParameter;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
@@ -55,8 +60,7 @@ class RepositoryTest extends TestCase
     {
         parent::setUp();
 
-        $this->connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:']);
-        $this->assertNotSame(false, $this->connection->exec('PRAGMA foreign_keys = ON;'));
+        $this->connection = $this->createConnection();
 
         $translator       = new Translator();
         $this->repository = new Repository(
@@ -101,26 +105,47 @@ class RepositoryTest extends TestCase
     /**
      * Test builder.
      */
+    public function testIndexWithEmptyFilters()
+    {
+        $filterParams = new FilterParameterCollection();
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Board::class));
+        $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
+            '`boards`.`updated_at`, `boards`.`deleted_at` ' .
+            'FROM boards';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEmpty($builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
     public function testIndexWithFilters()
     {
-        parse_str('filter[text][is-null]', $parameters);
-
-        $filterParams = [
-            Board::FIELD_TITLE => [
-                'equals'            => 'aaa',
-                'not-equals'        => ['bbb', 'ccc'],
-                'less-than'         => 'ddd',
-                'less-or-equals'    => 'eee',
-                'greater-than'      => 'fff',
-                'greater-or-equals' => 'ggg',
-                'like'              => 'hhh',
-                'not-like'          => ['iii', 'jjj'],
-                'in'                => 'kkk',
-                'not-in'            => ['lll', 'mmm'],
-                'is-null'           => null,
-                'not-null'          => 'whatever',
-            ]
+        $value       = [
+            'equals'            => 'aaa',
+            'not-equals'        => ['bbb', 'ccc'],
+            'less-than'         => 'ddd',
+            'less-or-equals'    => 'eee',
+            'greater-than'      => 'fff',
+            'greater-or-equals' => 'ggg',
+            'like'              => 'hhh',
+            'not-like'          => ['iii', 'jjj'],
+            'in'                => 'kkk',
+            'not-in'            => ['lll', 'mmm'],
+            'is-null'           => null,
+            'not-null'          => 'whatever',
         ];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, $value, false, null)
+        );
 
         $errors = new ErrorCollection();
         $this->assertNotNull($builder = $this->repository->index(Board::class));
@@ -166,11 +191,44 @@ class RepositoryTest extends TestCase
     /**
      * Test builder.
      */
+    public function testIndexWithFiltersJoinedWithOR()
+    {
+        $value        = [
+            'greater-or-equals' => 'aaa',
+            'less-or-equals'    => 'bbb',
+        ];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->withOr()->add(
+            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, $value, false, null)
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Board::class));
+        $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
+            '`boards`.`updated_at`, `boards`.`deleted_at` ' .
+            'FROM boards ' .
+            'WHERE (`boards`.`title` >= :dcValue1) OR (`boards`.`title` <= :dcValue2)';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEquals([
+            'dcValue1'  => 'aaa',
+            'dcValue2'  => 'bbb',
+        ], $builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
     public function testIndexWithSorting()
     {
         $sortingParams = [
-            Board::FIELD_TITLE => true,
-            Board::FIELD_ID    => false,
+            $this->createSortParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, true),
+            $this->createSortParameter(BoardSchema::RESOURCE_ID, Board::FIELD_ID, false),
+            $this->createSortParameter(BoardSchema::ATTR_CREATED_AT, Board::FIELD_CREATED_AT, false),
         ];
 
         $this->assertNotNull($builder = $this->repository->index(Board::class));
@@ -180,7 +238,32 @@ class RepositoryTest extends TestCase
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
             'FROM boards ' .
-            'ORDER BY `boards`.`title` ASC, `boards`.`id_board` DESC';
+            'ORDER BY `boards`.`title` ASC, `boards`.`id_board` DESC, `boards`.`created_at` DESC';
+
+        $this->assertEquals($expected, $builder->getSQL());
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testIndexWithSortingByRelationships()
+    {
+        $isRel         = true;
+        $type1         = RelationshipTypes::BELONGS_TO;
+        $type2         = RelationshipTypes::BELONGS_TO_MANY;
+        $sortingParams = [
+            $this->createSortParameter(CommentSchema::REL_USER, Comment::REL_USER, false, $isRel, $type1),
+            $this->createSortParameter(CommentSchema::REL_EMOTIONS, 'should be ignored', true, $isRel, $type2),
+        ];
+
+        $this->assertNotNull($builder = $this->repository->index(Comment::class));
+        $this->repository->applySorting($builder, Comment::class, $sortingParams);
+
+        $expected =
+            'SELECT `comments`.`id_comment`, `comments`.`id_post_fk`, `comments`.`id_user_fk`, ' .
+                '`comments`.`text`, `comments`.`created_at`, `comments`.`updated_at`, `comments`.`deleted_at` ' .
+            'FROM comments ' .
+            'ORDER BY `comments`.`id_user_fk` DESC';
 
         $this->assertEquals($expected, $builder->getSQL());
     }
@@ -190,15 +273,17 @@ class RepositoryTest extends TestCase
      */
     public function testIndexWithVariousParams()
     {
-        $filterParams = [
-            Board::FIELD_TITLE => [
-                'eq' => 'aaa',
-            ]
+        $value        = [
+            'eq' => 'aaa',
         ];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, $value, false, null)
+        );
 
         $sortingParams = [
-            Board::FIELD_TITLE => true,
-            Board::FIELD_ID    => false,
+            $this->createSortParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, true),
+            $this->createSortParameter(BoardSchema::RESOURCE_ID, Board::FIELD_ID, false),
         ];
 
         $errors = new ErrorCollection();
@@ -225,19 +310,17 @@ class RepositoryTest extends TestCase
      */
     public function testIndexWithVariousInvalidParams()
     {
-        $filterParams = [
-            '', // this one and ..
-            'xxx', // ... this one are not possible though we test it won't crash
-            Board::FIELD_ID    => '',
-            Board::FIELD_TITLE => [
-                'xxx-unknown-operation-xxx' => 'aaa',
-            ]
-        ];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::RESOURCE_ID, Board::FIELD_ID, '', false, null)
+        )->add(
+            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, ['unknown-op' => 'aaa'], false, null)
+        );
 
         $errors = new ErrorCollection();
         $this->assertNotNull($builder = $this->repository->index(Board::class));
         $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
-        $this->assertCount(4, $errors);
+        $this->assertCount(2, $errors);
     }
 
     /**
@@ -252,12 +335,12 @@ class RepositoryTest extends TestCase
 
         $this->assertNotNull($builder = $this->repository->create(Board::class, $attributes));
 
-        $expected ='INSERT INTO boards (id_board, title) VALUES(?, ?)';
+        $expected ='INSERT INTO boards (id_board, title) VALUES(:dcValue1, :dcValue2)';
 
         $this->assertEquals($expected, $builder->getSQL());
         $this->assertEquals([
-            1  => '123',
-            2  => 'aaa',
+            'dcValue1'  => '123',
+            'dcValue2'  => 'aaa',
         ], $builder->getParameters());
     }
 
@@ -273,13 +356,13 @@ class RepositoryTest extends TestCase
 
         $this->assertNotNull($builder = $this->repository->update(Board::class, 123, $updated));
 
-        $expected ='UPDATE boards SET title = ?, updated_at = ? WHERE `boards`.`id_board`=?';
+        $expected ='UPDATE boards SET title = :dcValue1, updated_at = :dcValue2 WHERE `boards`.`id_board`=:dcValue3';
 
         $this->assertEquals($expected, $builder->getSQL());
         $this->assertEquals([
-            1  => 'bbb',
-            2  => '2000-01-02',
-            3  => '123',
+            'dcValue1'  => 'bbb',
+            'dcValue2'  => '2000-01-02',
+            'dcValue3'  => '123',
         ], $builder->getParameters());
     }
 
@@ -415,17 +498,18 @@ class RepositoryTest extends TestCase
      */
     public function testReadRelationshipWithMixedParams()
     {
-        (new MigrationRunner())->migrate($this->connection->getSchemaManager());
-        (new SeedRunner())->run($this->connection);
+        $this->migrateDatabase($this->connection);
 
-        $filterParams = [
-            Emotion::FIELD_NAME => [
-                'like' => '%ss%',
-            ]
+        $value        = [
+            'like' => '%ss%',
         ];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(EmotionSchema::ATTR_NAME, Emotion::FIELD_NAME, $value, false, null)
+        );
 
         $sortingParams = [
-            Emotion::FIELD_ID => false,
+            $this->createSortParameter(EmotionSchema::RESOURCE_ID, Emotion::FIELD_ID, false),
         ];
 
         $indexBind = ':index';
@@ -442,5 +526,27 @@ class RepositoryTest extends TestCase
 
         $this->assertNotEmpty($emotions = $builder->setParameter($indexBind, 2)->execute()->fetchAll());
         $this->assertCount(2, $emotions);
+    }
+
+    /**
+     * @param string   $originalName
+     * @param string   $name
+     * @param bool     $isAscending
+     * @param bool     $isRelationship
+     * @param null|int $relationshipType
+     *
+     * @return SortParameterInterface
+     */
+    private function createSortParameter(
+        $originalName,
+        $name,
+        $isAscending,
+        $isRelationship = false,
+        $relationshipType = null
+    ) {
+        $sortParam = new JsonLibrarySortParameter($originalName, $isAscending);
+        $result    = new SortParameter($sortParam, $name, $isRelationship, $relationshipType);
+
+        return $result;
     }
 }

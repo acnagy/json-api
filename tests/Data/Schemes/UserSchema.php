@@ -45,13 +45,7 @@ class UserSchema extends BaseSchema
     const ATTR_LANGUAGE = 'language-attribute';
 
     /** Attribute name */
-    const ATTR_CREATED_AT = 'created-at-attribute';
-
-    /** Attribute name */
-    const ATTR_UPDATED_AT = 'updated-at-attribute';
-
-    /** Attribute name */
-    const ATTR_DELETED_AT = 'deleted-at-attribute';
+    const ATTR_IS_ACTIVE = 'is-active-attribute';
 
     /** Relationship name */
     const REL_ROLE = 'role-relationship';
@@ -74,6 +68,7 @@ class UserSchema extends BaseSchema
                 self::ATTR_LAST_NAME  => Model::FIELD_LAST_NAME,
                 self::ATTR_EMAIL      => Model::FIELD_EMAIL,
                 self::ATTR_LANGUAGE   => Model::FIELD_LANGUAGE,
+                self::ATTR_IS_ACTIVE  => Model::FIELD_IS_ACTIVE,
                 self::ATTR_CREATED_AT => Model::FIELD_CREATED_AT,
                 self::ATTR_UPDATED_AT => Model::FIELD_UPDATED_AT,
             ],

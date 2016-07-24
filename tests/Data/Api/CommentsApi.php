@@ -26,6 +26,11 @@ class CommentsApi extends AppCrud
 {
     const MODEL_CLASS = Comment::class;
 
+    const DEBUG_KEY_DEFAULT_FILTER_INDEX = true;
+
+    /** @var bool Key for tests */
+    public static $isFilterIndexForCurrentUser = self::DEBUG_KEY_DEFAULT_FILTER_INDEX;
+
     /**
      * @inheritdoc
      */
@@ -33,15 +38,30 @@ class CommentsApi extends AppCrud
     {
         $builder = parent::builderOnIndex($builder);
 
-        // suppose we want to limit API `index` method to only comments of current user
-        // we can extend builder here
+        if (static::$isFilterIndexForCurrentUser) {
+            // suppose we want to limit API `index` method to only comments of current user
+            // we can extend builder here
 
-        $table     = Comment::TABLE_NAME;
-        $column    = Comment::FIELD_ID_USER;
-        $curUserId = 1;
+            $table     = Comment::TABLE_NAME;
+            $column    = Comment::FIELD_ID_USER;
+            $curUserId = 1;
 
-        $builder->andWhere("`$table`.`$column` = " . $builder->createNamedParameter($curUserId));
+            $builder->andWhere("`$table`.`$column` = " . $builder->createNamedParameter($curUserId));
+        }
 
         return $builder;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function create(array $attributes, array $toMany = [])
+    {
+        // suppose we want to create comments using current user as an author.
+        $curUserId = 1;
+
+        $attributes[Comment::FIELD_ID_USER] = $curUserId;
+
+        return parent::create($attributes, $toMany);
     }
 }

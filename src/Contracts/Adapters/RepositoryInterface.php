@@ -18,6 +18,8 @@
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\QueryBuilder;
+use Limoncello\JsonApi\Contracts\Http\Query\SortParameterInterface;
+use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
@@ -94,19 +96,24 @@ interface RepositoryInterface
     public function cleanToManyRelationship($modelClass, $indexBind, $name);
 
     /**
-     * @param ErrorCollection $errors
-     * @param QueryBuilder    $builder
-     * @param string          $modelClass
-     * @param array           $filterParams
+     * @param ErrorCollection           $errors
+     * @param QueryBuilder              $builder
+     * @param string                    $modelClass
+     * @param FilterParameterCollection $filterParams
      *
      * @return void
      */
-    public function applyFilters(ErrorCollection $errors, QueryBuilder $builder, $modelClass, array $filterParams);
+    public function applyFilters(
+        ErrorCollection $errors,
+        QueryBuilder $builder,
+        $modelClass,
+        FilterParameterCollection $filterParams
+    );
 
     /**
-     * @param QueryBuilder $builder
-     * @param string       $modelClass
-     * @param array        $sortParams
+     * @param QueryBuilder             $builder
+     * @param string                   $modelClass
+     * @param SortParameterInterface[] $sortParams
      *
      * @return void
      */

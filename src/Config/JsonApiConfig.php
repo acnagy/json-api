@@ -26,7 +26,7 @@ class JsonApiConfig implements JsonApiConfigInterface
     /**
      * @var array
      */
-    private $modelSchemaMap;
+    private $modelSchemaMap = [];
 
     /**
      * @var int
@@ -59,14 +59,6 @@ class JsonApiConfig implements JsonApiConfigInterface
     private $pagingSize = 20;
 
     /**
-     * @param array $modelSchemaMap
-     */
-    public function __construct(array $modelSchemaMap)
-    {
-        $this->modelSchemaMap = $modelSchemaMap;
-    }
-
-    /**
      * @inheritdoc
      */
     public function getJsonEncodeOptions()
@@ -87,11 +79,27 @@ class JsonApiConfig implements JsonApiConfigInterface
     /**
      * @inheritdoc
      */
+    public function getJsonEncodeDepth()
+    {
+        return $this->depth;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function setJsonEncodeDepth($depth)
     {
         $this->depth = $depth;
 
         return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function isShowVersion()
+    {
+        return $this->isShowVersion;
     }
 
     /**
@@ -117,11 +125,27 @@ class JsonApiConfig implements JsonApiConfigInterface
     /**
      * @inheritdoc
      */
+    public function getMeta()
+    {
+        return $this->meta;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function setMeta($meta)
     {
         $this->meta = $meta;
 
         return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getUriPrefix()
+    {
+        return $this->uriPrefix;
     }
 
     /**
@@ -137,9 +161,35 @@ class JsonApiConfig implements JsonApiConfigInterface
     /**
      * @inheritdoc
      */
+    public function getRelationshipPagingSize()
+    {
+        return $this->pagingSize;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function setRelationshipPagingSize($size)
     {
         $this->pagingSize = $size;
+
+        return $this;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getModelSchemaMap()
+    {
+        return $this->modelSchemaMap;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setModelSchemaMap(array $modelSchemaMap)
+    {
+        $this->modelSchemaMap = $modelSchemaMap;
 
         return $this;
     }
@@ -153,13 +203,31 @@ class JsonApiConfig implements JsonApiConfigInterface
             self::KEY_MODEL_TO_SCHEMA_MAP => $this->modelSchemaMap,
 
             self::KEY_JSON => [
-                self::KEY_JSON_RELATIONSHIP_PAGING_SIZE => $this->pagingSize,
-                self::KEY_JSON_OPTIONS                  => $this->options,
-                self::KEY_JSON_DEPTH                    => $this->depth,
-                self::KEY_JSON_IS_SHOW_VERSION          => $this->isShowVersion,
-                self::KEY_JSON_VERSION_META             => $this->meta,
-                self::KEY_JSON_URL_PREFIX               => $this->uriPrefix,
+                self::KEY_JSON_RELATIONSHIP_PAGING_SIZE => $this->getRelationshipPagingSize(),
+                self::KEY_JSON_OPTIONS                  => $this->getJsonEncodeOptions(),
+                self::KEY_JSON_DEPTH                    => $this->getJsonEncodeDepth(),
+                self::KEY_JSON_IS_SHOW_VERSION          => $this->isShowVersion(),
+                self::KEY_JSON_VERSION_META             => $this->getMeta(),
+                self::KEY_JSON_URL_PREFIX               => $this->getUriPrefix(),
             ],
         ];
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function setConfig(array $data)
+    {
+        $this->setModelSchemaMap($data[self::KEY_MODEL_TO_SCHEMA_MAP]);
+
+        $jsonSection = $data[self::KEY_JSON];
+        $this->setRelationshipPagingSize($jsonSection[self::KEY_JSON_RELATIONSHIP_PAGING_SIZE]);
+        $this->setJsonEncodeOptions($jsonSection[self::KEY_JSON_OPTIONS]);
+        $this->setJsonEncodeDepth($jsonSection[self::KEY_JSON_DEPTH]);
+        $jsonSection[self::KEY_JSON_IS_SHOW_VERSION] === true ? $this->setShowVersion() : $this->setHideVersion();
+        $this->setMeta($jsonSection[self::KEY_JSON_VERSION_META]);
+        $this->setUriPrefix($jsonSection[self::KEY_JSON_URL_PREFIX]);
+
+        return $this;
     }
 }

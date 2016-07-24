@@ -17,19 +17,24 @@
  */
 
 use Interop\Container\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
+use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\Api\CrudInterface;
-use Limoncello\JsonApi\Contracts\Document\ParserInterface;
-use Limoncello\JsonApi\Contracts\Document\ResourceInterface;
-use Limoncello\JsonApi\Contracts\Document\TransformerInterface;
+use Limoncello\JsonApi\Contracts\Config\JsonApiConfigInterface;
+use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\Http\ControllerInterface;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as SchemesContainerInterface;
+use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface;
+use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as JsonSchemesContainerInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
-use Limoncello\JsonApi\Transformer\BaseQueryTransformer;
 use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
+use Neomerx\JsonApi\Contracts\Http\Headers\MediaTypeInterface;
 use Neomerx\JsonApi\Contracts\Http\Query\QueryParametersParserInterface;
+use Neomerx\JsonApi\Contracts\Http\ResponsesInterface;
 use Neomerx\JsonApi\Exceptions\JsonApiException;
+use Neomerx\JsonApi\Http\Headers\MediaType;
+use Neomerx\JsonApi\Http\Headers\SupportedExtensions;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 
@@ -43,12 +48,6 @@ abstract class BaseController implements ControllerInterface
 
     /** JSON API Schema class name */
     const SCHEMA_CLASS = null;
-
-    /** Transformer class name */
-    const CREATE_TRANSFORMER_CLASS = null;
-
-    /** Transformer class name */
-    const UPDATE_TRANSFORMER_CLASS = null;
 
     /** URI key used in routing table */
     const ROUTE_KEY_INDEX = null;
@@ -65,7 +64,7 @@ abstract class BaseController implements ControllerInterface
         list ($filters, $sorts, $includes, $paging) =
             static::mapQueryParameters($container, $encodingParams, static::SCHEMA_CLASS);
 
-        $modelData = self::createApi($container)->index($filters, $sorts, $includes, $paging);
+        $modelData = static::createApi($container)->index($filters, $sorts, $includes, $paging);
         $responses = static::createResponses($container, $request, $encodingParams);
         $response  = $modelData->getPaginatedData()->getData() === null ?
             $responses->getCodeResponse(404) : $responses->getContentResponse($modelData);
@@ -78,9 +77,11 @@ abstract class BaseController implements ControllerInterface
      */
     public static function create(array $routeParams, ContainerInterface $container, ServerRequestInterface $request)
     {
-        $resource = self::parseInputOnCreate($container, $request);
-        $index    = self::createApi($container)->create($resource);
-        $data     = self::createApi($container)->read($index);
+        list ($attributes, $toMany) = static::parseInputOnCreate($container, $request);
+
+        $index = self::createApi($container)->create($attributes, $toMany);
+        $data  = self::createApi($container)->read($index);
+
         $response = static::createResponses($container, $request)->getCreatedResponse($data);
 
         return $response;
@@ -111,9 +112,9 @@ abstract class BaseController implements ControllerInterface
      */
     public static function update(array $routeParams, ContainerInterface $container, ServerRequestInterface $request)
     {
-        $resource = self::parseInputOnUpdate($container, $request);
         $index    = $routeParams[static::ROUTE_KEY_INDEX];
-        self::createApi($container)->update($index, $resource);
+        list ($attributes, $toMany) = static::parseInputOnUpdate($index, $container, $request);
+        self::createApi($container)->update($index, $attributes, $toMany);
         $data     = self::createApi($container)->read($index);
         $response = static::createResponses($container, $request)->getContentResponse($data);
 
@@ -151,8 +152,8 @@ abstract class BaseController implements ControllerInterface
 
         /** @var SchemaStorageInterface $modelSchemaStorage */
         $modelSchemaStorage = $container->get(SchemaStorageInterface::class);
-        /** @var SchemesContainerInterface $jsonSchemaStorage */
-        $jsonSchemaStorage  = $container->get(SchemesContainerInterface::class);
+        /** @var JsonSchemesContainerInterface $jsonSchemaStorage */
+        $jsonSchemaStorage  = $container->get(JsonSchemesContainerInterface::class);
         /** @var SchemaInterface $schemaClass */
         $schemaClass  = static::SCHEMA_CLASS;
         $modelRelName = $schemaClass::getMappings()[$schemaClass::SCHEMA_RELATIONSHIPS][$relationshipName];
@@ -179,50 +180,15 @@ abstract class BaseController implements ControllerInterface
      */
     protected static function createApi(ContainerInterface $container)
     {
+        $factory            = $container->get(FactoryInterface::class);
+        $repository         = $container->get(RepositoryInterface::class);
+        $modelSchemes       = $container->get(SchemaStorageInterface::class);
+        $paginationStrategy = $container->get(PaginationStrategyInterface::class);
+
         $apiClass = static::API_CLASS;
-        $api      = new $apiClass($container);
+        $api      = new $apiClass($factory, $repository, $modelSchemes, $paginationStrategy);
 
         return $api;
-    }
-
-    /**
-     * @param ContainerInterface     $container
-     * @param ServerRequestInterface $request
-     *
-     * @return ResourceInterface|null
-     */
-    protected static function parseInputOnCreate(ContainerInterface $container, ServerRequestInterface $request)
-    {
-        $transformerClass = static::CREATE_TRANSFORMER_CLASS;
-        /** @var TransformerInterface $transformer */
-        $transformer      = new $transformerClass($container);
-
-        /** @var FactoryInterface $factory */
-        $factory    = $container->get(FactoryInterface::class);
-        $translator = $factory->createTranslator();
-        $parsed     = self::parseBody($factory->createParser($transformer, $translator), $request);
-
-        return $parsed;
-    }
-
-    /**
-     * @param ContainerInterface     $container
-     * @param ServerRequestInterface $request
-     *
-     * @return ResourceInterface|null
-     */
-    protected static function parseInputOnUpdate(ContainerInterface $container, ServerRequestInterface $request)
-    {
-        $transformerClass = static::UPDATE_TRANSFORMER_CLASS;
-        /** @var TransformerInterface $transformer */
-        $transformer      = new $transformerClass($container);
-
-        /** @var FactoryInterface $factory */
-        $factory    = $container->get(FactoryInterface::class);
-        $translator = $factory->createTranslator();
-        $parsed     = self::parseBody($factory->createParser($transformer, $translator), $request);
-
-        return $parsed;
     }
 
     /**
@@ -238,12 +204,12 @@ abstract class BaseController implements ControllerInterface
         $schemaClass
     ) {
         /** @var FactoryInterface $factory */
-        $factory          = $container->get(FactoryInterface::class);
-        $errors           = $factory->createErrorCollection();
-        $queryTransformer = new BaseQueryTransformer(
+        $factory = $container->get(FactoryInterface::class);
+        $errors  = $factory->createErrorCollection();
+        $queryTransformer = new QueryTransformer(
             $container->get(SchemaStorageInterface::class),
-            $container->get(SchemesContainerInterface::class),
-            $factory->createTranslator(),
+            $container->get(JsonSchemesContainerInterface::class),
+            $container->get(TranslatorInterface::class),
             $schemaClass
         );
 
@@ -256,20 +222,76 @@ abstract class BaseController implements ControllerInterface
     }
 
     /**
-     * @param ParserInterface        $parser
+     * @param ContainerInterface               $container
+     * @param ServerRequestInterface           $request
+     * @param EncodingParametersInterface|null $parameters
+     *
+     * @return ResponsesInterface
+     */
+    protected static function createResponses(
+        ContainerInterface $container,
+        ServerRequestInterface $request,
+        EncodingParametersInterface $parameters = null
+    ) {
+        /** @var EncoderInterface $encoder */
+        $encoder = $container->get(EncoderInterface::class);
+        $encoder->forOriginalUri($request->getUri());
+
+        /** @var JsonApiConfigInterface $config */
+        $config    = $container->get(JsonApiConfigInterface::class);
+        $urlPrefix = $config
+            ->getConfig()[JsonApiConfigInterface::KEY_JSON][JsonApiConfigInterface::KEY_JSON_URL_PREFIX];
+
+        /** @var JsonSchemesContainerInterface $jsonSchemes */
+        $jsonSchemes = $container->get(JsonSchemesContainerInterface::class);
+        $responses   = new Responses(
+            new MediaType(MediaTypeInterface::JSON_API_TYPE, MediaTypeInterface::JSON_API_SUB_TYPE),
+            new SupportedExtensions(),
+            $encoder,
+            $jsonSchemes,
+            $parameters,
+            $urlPrefix
+        );
+
+        return $responses;
+    }
+
+    /**
+     * @param ContainerInterface     $container
      * @param ServerRequestInterface $request
      *
-     * @return ResourceInterface|null
+     * @return array
      */
-    private static function parseBody(ParserInterface $parser, ServerRequestInterface $request)
+    protected static function parseJson(ContainerInterface $container, ServerRequestInterface $request)
     {
-        $text   = (string)$request->getBody();
-        $parsed = $parser->parse($text);
-
-        if ($parser->getErrors()->count() > 0 || $parsed === null) {
-            throw new JsonApiException($parser->getErrors());
+        $body = (string)$request->getBody();
+        if (empty($body) === true || ($json = json_decode($body, true)) === null) {
+            /** @var FactoryInterface $factory */
+            $factory = $container->get(FactoryInterface::class);
+            $errors  = $factory->createErrorCollection();
+            /** @var TranslatorInterface $translator */
+            $translator = $container->get(TranslatorInterface::class);
+            $errors->addDataError($translator->get(TranslatorInterface::MSG_ERR_INVALID_ELEMENT));
+            throw new JsonApiException($errors);
         }
 
-        return $parsed;
+        return $json;
+    }
+
+    /**
+     * @param ContainerInterface $container
+     *
+     * @return SchemaInterface
+     */
+    protected static function getSchema(ContainerInterface $container)
+    {
+        /** @var SchemaInterface $schemaClass */
+        $schemaClass = static::SCHEMA_CLASS;
+        $modelClass  = $schemaClass::MODEL;
+        /** @var JsonSchemesContainerInterface $jsonSchemes */
+        $jsonSchemes = $container->get(JsonSchemesContainerInterface::class);
+        $schema      = $jsonSchemes->getSchemaByType($modelClass);
+
+        return $schema;
     }
 }

@@ -1,4 +1,4 @@
-<?php namespace Limoncello\Tests\JsonApi\Data\Transformers;
+<?php namespace Limoncello\JsonApi\Contracts\Http\Query;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,21 +16,33 @@
  * limitations under the License.
  */
 
-use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema as Schema;
-
 /**
- * @package Limoncello\Tests\JsonApi
+ * @package Limoncello\JsonApi
  */
-class PostOnCreate extends BaseTransformer
+interface SortParameterInterface
 {
-    /** @inheritdoc */
-    const SCHEMA_CLASS = Schema::class;
+    /**
+     * @return string
+     */
+    public function getName();
 
     /**
-     * @inheritdoc
+     * @return string
      */
-    public function isValidId($index)
-    {
-        return $index === null;
-    }
+    public function getOriginalName();
+
+    /**
+     * @return boolean
+     */
+    public function isIsRelationship();
+
+    /**
+     * @return int|null
+     */
+    public function getRelationshipType();
+
+    /**
+     * @return bool
+     */
+    public function isAscending();
 }

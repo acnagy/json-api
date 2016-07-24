@@ -62,7 +62,7 @@ class PaginationStrategy implements PaginationStrategyInterface
     public function parseParameters(array $parameters = null)
     {
         if ($parameters === null) {
-            return [0, static::DEFAULT_LIMIT_SIZE + 1];
+            return [0, $this->defaultPageLimit + 1];
         }
 
         $limit = $this->getValue(

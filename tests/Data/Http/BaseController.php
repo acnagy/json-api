@@ -1,4 +1,4 @@
-<?php namespace Limoncello\Tests\JsonApi\Data\Transformers;
+<?php namespace Limoncello\Tests\JsonApi\Data\Http;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,21 +16,14 @@
  * limitations under the License.
  */
 
-use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema as Schema;
-
 /**
  * @package Limoncello\Tests\JsonApi
  */
-class CommentOnCreate extends BaseTransformer
+abstract class BaseController extends \Limoncello\JsonApi\Http\BaseController
 {
-    /** @inheritdoc */
-    const SCHEMA_CLASS = Schema::class;
+    /** URI key used in routing table */
+    const ROUTE_KEY_INDEX = 'idx';
 
-    /**
-     * @inheritdoc
-     */
-    public function isValidId($index)
-    {
-        return $index === null;
-    }
+    /** API URI prefix */
+    const API_URI_PREFIX = '/api/v1';
 }

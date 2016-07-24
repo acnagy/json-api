@@ -32,15 +32,6 @@ class EmotionSchema extends BaseSchema
     /** Attribute name */
     const ATTR_NAME = 'text-attribute';
 
-    /** Attribute name */
-    const ATTR_CREATED_AT = 'created-at-attribute';
-
-    /** Attribute name */
-    const ATTR_UPDATED_AT = 'updated-at-attribute';
-
-    /** Attribute name */
-    const ATTR_DELETED_AT = 'deleted-at-attribute';
-
     /** Relationship name */
     const REL_COMMENTS = 'comments-relationship';
 

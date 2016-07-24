@@ -1,5 +1,0 @@
-A few thoughts on parsing JSON API documents.
-
-For the purposes of API operations such as `create` and `update` we need only a subset of possibilities of JSON API. We don't need `links` or `meta` and as a top level resource we support only a **single** resource in `data` section. Also in relationships we need only identities of resources as we ignore other fields in relationships. Why we have to ignore other fields? It comes from the fact that according to JSON API spec we can return 1 `identity` of newly created resource. Which means we can't create more than 1. Which in its turn means it doesn't make any sense to send data for more than 1. For a resource we need it's `id`, `type`, `attributes` and identities for `relationships`. Though technically we can update more than one resource at once for consistency with `create` operation we support these operations for single resources.
-
-Thus parser act accordingly. It parses only single resources and only `id`, `type`, `attributes` and `relationships` (to-one and to-many).

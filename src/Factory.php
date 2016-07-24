@@ -18,18 +18,11 @@
 
 use Doctrine\DBAL\Connection;
 use Limoncello\JsonApi\Adapters\Repository;
-use Limoncello\JsonApi\Api\Crud;
 use Limoncello\JsonApi\Api\ModelsData;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
-use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
-use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
-use Limoncello\JsonApi\Contracts\Document\TransformerInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
 use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
-use Limoncello\JsonApi\Document\Parser;
-use Limoncello\JsonApi\Document\Resource;
-use Limoncello\JsonApi\Document\ResourceIdentifier;
 use Limoncello\JsonApi\Encoder\Encoder;
 use Limoncello\JsonApi\I18n\Translator;
 use Limoncello\JsonApi\Schema\Container;
@@ -154,36 +147,12 @@ class Factory implements FactoryInterface
     /**
      * @inheritdoc
      */
-    public function createResourceIdentifier($type, $index)
-    {
-        return new ResourceIdentifier($type, $index);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function createResource($type, $index, array $attributes, array $toOne, array $toMany)
-    {
-        return new Resource($type, $index, $attributes, $toOne, $toMany);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function createParser(TransformerInterface $transformer, T $translator)
-    {
-        return new Parser($this, $transformer, $translator);
-    }
-
-    /**
-     * @inheritdoc
-     */
     public function createTranslator()
     {
         return new Translator();
     }
 
-    /** @noinspection PhpTooManyParametersInspection
+    /**
      * @inheritdoc
      */
     public function createRepository(
@@ -193,19 +162,6 @@ class Factory implements FactoryInterface
         T $translator
     ) {
         return new Repository($connection, $schemaStorage, $filterOperations, $translator);
-    }
-
-    /**
-     * @inheritdoc
-     */
-    public function createCrud(
-        $modelClass,
-        RepositoryInterface $repository,
-        SchemaStorageInterface $modelSchemes,
-        PaginationStrategyInterface $paginationStrategy,
-        T $translator
-    ) {
-        return new Crud($this, $modelClass, $repository, $modelSchemes, $paginationStrategy, $translator);
     }
 
     /**

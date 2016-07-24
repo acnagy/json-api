@@ -16,7 +16,6 @@
  * limitations under the License.
  */
 
-use Doctrine\DBAL\DriverManager;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Type;
@@ -48,7 +47,7 @@ class FilterOperationsTest extends TestCase
     {
         parent::setUp();
 
-        $connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:']);
+        $connection = $this->createConnection();
 
         $this->builder = $connection->createQueryBuilder();
         $this->filters = new FilterOperations(new Translator());

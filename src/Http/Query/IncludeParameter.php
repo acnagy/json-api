@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Document;
+<?php namespace Limoncello\JsonApi\Http\Query;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,46 +16,46 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\Document\ResourceIdentifierInterface;
+use Limoncello\JsonApi\Contracts\Http\Query\IncludeParameterInterface;
 
 /**
  * @package Limoncello\JsonApi
  */
-class ResourceIdentifier implements ResourceIdentifierInterface
+class IncludeParameter implements IncludeParameterInterface
 {
     /**
-     * @var string|int|null
+     * @var array
      */
-    private $index;
+    private $path;
 
     /**
      * @var string
      */
-    private $type;
+    private $originalPath;
 
     /**
-     * @param string          $type
-     * @param int|null|string $index
+     * @param string $originalPath
+     * @param array  $path
      */
-    public function __construct($type, $index)
+    public function __construct($originalPath, array $path)
     {
-        $this->index = $index;
-        $this->type  = $type;
+        $this->originalPath = $originalPath;
+        $this->path         = $path;
     }
 
     /**
      * @inheritdoc
      */
-    public function getId()
+    public function getOriginalPath()
     {
-        return $this->index;
+        return $this->originalPath;
     }
 
     /**
      * @inheritdoc
      */
-    public function getType()
+    public function getPath()
     {
-        return $this->type;
+        return $this->path;
     }
 }

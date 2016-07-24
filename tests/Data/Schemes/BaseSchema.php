@@ -18,12 +18,25 @@
 
 use Limoncello\JsonApi\Schema\Schema;
 use Limoncello\Tests\JsonApi\Data\Models\Model;
+use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 
 /**
  * @package Limoncello\Tests\JsonApi
  */
 abstract class BaseSchema extends Schema
 {
+    /** Attribute name */
+    const RESOURCE_ID = DocumentInterface::KEYWORD_ID;
+
+    /** Attribute name */
+    const ATTR_CREATED_AT = 'created-at-attribute';
+
+    /** Attribute name */
+    const ATTR_UPDATED_AT = 'updated-at-attribute';
+
+    /** Attribute name */
+    const ATTR_DELETED_AT = 'deleted-at-attribute';
+
     /**
      * @inheritdoc
      */

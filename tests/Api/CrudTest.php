@@ -17,29 +17,32 @@
  */
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DriverManager;
 use Limoncello\JsonApi\Adapters\FilterOperations;
 use Limoncello\JsonApi\Adapters\PaginationStrategy;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Api\CrudInterface;
-use Limoncello\JsonApi\Contracts\Document\ParserInterface;
+use Limoncello\JsonApi\Contracts\Http\Query\SortParameterInterface;
 use Limoncello\JsonApi\Factory;
+use Limoncello\JsonApi\Http\Query\FilterParameter;
+use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
+use Limoncello\JsonApi\Http\Query\IncludeParameter;
+use Limoncello\JsonApi\Http\Query\SortParameter;
+use Limoncello\Models\RelationshipTypes;
 use Limoncello\Tests\JsonApi\Data\Api\CommentsApi;
 use Limoncello\Tests\JsonApi\Data\Api\PostsApi;
 use Limoncello\Tests\JsonApi\Data\Api\UsersApi;
-use Limoncello\Tests\JsonApi\Data\Migrations\Runner as MigrationRunner;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\CommentEmotion;
 use Limoncello\Tests\JsonApi\Data\Models\Post;
 use Limoncello\Tests\JsonApi\Data\Models\User;
-use Limoncello\Tests\JsonApi\Data\Seeds\Runner as SeedRunner;
-use Limoncello\Tests\JsonApi\Data\Transformers\CommentOnCreate;
-use Limoncello\Tests\JsonApi\Data\Transformers\CommentOnUpdate;
-use Limoncello\Tests\JsonApi\Data\Transformers\PostOnCreate;
+use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\UserSchema;
 use Limoncello\Tests\JsonApi\TestCase;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Document\ErrorInterface;
+use Neomerx\JsonApi\Encoder\Parameters\SortParameter as JsonLibrarySortParameter;
 use Neomerx\JsonApi\Exceptions\JsonApiException;
 use PDO;
 
@@ -56,63 +59,24 @@ class CrudTest extends TestCase
     private $connection;
 
     /**
-     * Set up tests.
-     */
-    protected function setUp()
-    {
-        parent::setUp();
-        $this->init();
-    }
-
-    /**
-     * @return $this
-     */
-    public function init()
-    {
-        $this->connection = DriverManager::getConnection(['url' => 'sqlite:///:memory:']);
-        $this->assertNotSame(false, $this->connection->exec('PRAGMA foreign_keys = ON;'));
-
-        (new MigrationRunner())->migrate($this->connection->getSchemaManager());
-        (new SeedRunner())->run($this->connection);
-
-        return $this;
-    }
-
-    /**
      * Test create read and delete newly created resource.
      */
     public function testCreateReadAndDeletePost()
     {
-        $userId  = 1;
-        $boardId = 2;
-        $text    = 'Some text';
-        $title   = 'Some title';
-        $json = <<<EOT
-        {
-            "data" : {
-                "type"       : "posts",
-                "id"         : null,
-                "attributes" : {
-                    "title-attribute" : "$title",
-                    "text-attribute"  : "$text"
-                },
-                "relationships" : {
-                    "user-relationship" : {
-                        "data" : { "type" : "users", "id" : $userId }
-                    },
-                    "board-relationship" : {
-                        "data" : { "type" : "boards", "id" : $boardId }
-                    }
-                }
-            }
-        }
-EOT;
+        $userId     = 1;
+        $boardId    = 2;
+        $text       = 'Some text';
+        $title      = 'Some title';
+        $attributes = [
+            Post::FIELD_TITLE    => $title,
+            Post::FIELD_TEXT     => $text,
+            Post::FIELD_ID_BOARD => $boardId,
+            Post::FIELD_ID_USER  => $userId,
+        ];
 
         $crud = $this->createCrud(PostsApi::class);
 
-        $parser   = $this->createPostParserForCreate();
-        $resource = $parser->parse($json);
-        $this->assertNotNull($index = $crud->create($resource));
+        $this->assertNotNull($index = $crud->create($attributes));
         $this->assertNotNull($data = $crud->read($index));
         $this->assertNotNull($model = $data->getPaginatedData()->getData());
 
@@ -141,37 +105,21 @@ EOT;
      */
     public function testCreateCommentsWithEmotions()
     {
-        $userId = 1;
-        $postId = 2;
-        $text   = 'Some text';
-        $json = <<<EOT
-        {
-            "data" : {
-                "type"       : "comments",
-                "id"         : null,
-                "attributes" : {
-                    "text-attribute" : "$text"
-                },
-                "relationships" : {
-                    "user-relationship" : {
-                        "data" : { "type" : "users", "id" : $userId }
-                    },
-                    "post-relationship" : {
-                        "data" : { "type" : "posts", "id" : $postId }
-                    },
-                    "emotions-relationship" : {
-                        "data" : [{ "type" : "emotions", "id" : 3 }, { "type" : "emotions", "id" : "4" }]
-                    }
-                }
-            }
-        }
-EOT;
+        $userId     = 1;
+        $postId     = 2;
+        $text       = 'Some text';
+        $attributes = [
+            Comment::FIELD_TEXT    => $text,
+            Comment::FIELD_ID_POST => $postId,
+            Comment::FIELD_ID_USER => $userId,
+        ];
+        $toMany     = [
+            Comment::REL_EMOTIONS => ['3', '4'],
+        ];
+
         $crud = $this->createCrud(CommentsApi::class);
 
-        $parser   = $this->createCommentParserForCreate();
-        $resource = $parser->parse($json);
-        $this->assertLessThanOrEqual(0, $parser->getErrors()->count());
-        $this->assertNotNull($index = $crud->create($resource));
+        $this->assertNotNull($index = $crud->create($attributes, $toMany));
         $this->assertNotNull($data = $crud->read($index));
         $this->assertNotNull($model = $data->getPaginatedData()->getData());
 
@@ -198,9 +146,9 @@ EOT;
 
         // same checks but this time via API
         $includePaths = [
-            Comment::REL_USER,
-            Comment::REL_POST,
-            Comment::REL_EMOTIONS,
+            new IncludeParameter(CommentSchema::REL_USER, [Comment::REL_USER]),
+            new IncludeParameter(CommentSchema::REL_POST, [Comment::REL_POST]),
+            new IncludeParameter(CommentSchema::REL_EMOTIONS, [Comment::REL_EMOTIONS]),
         ];
         $this->assertNotNull($data = $crud->read($index, null, $includePaths));
         $this->assertNotNull($comment = $data->getPaginatedData()->getData());
@@ -225,38 +173,22 @@ EOT;
      */
     public function testUpdateCommentsWithEmotions()
     {
-        $commentId = 1;
-        $userId    = 2;
-        $postId    = 3;
-        $text      = 'Some text';
-        $json = <<<EOT
-        {
-            "data" : {
-                "type"       : "comments",
-                "id"         : $commentId,
-                "attributes" : {
-                    "text-attribute" : "$text"
-                },
-                "relationships" : {
-                    "user-relationship" : {
-                        "data" : { "type" : "users", "id" : $userId }
-                    },
-                    "post-relationship" : {
-                        "data" : { "type" : "posts", "id" : $postId }
-                    },
-                    "emotions-relationship" : {
-                        "data" : [{ "type" : "emotions", "id" : 3 }, { "type" : "emotions", "id" : "4" }]
-                    }
-                }
-            }
-        }
-EOT;
+        $commentId  = 1;
+        $userId     = 2;
+        $postId     = 3;
+        $text       = 'Some text';
+        $attributes = [
+            Comment::FIELD_TEXT    => $text,
+            Comment::FIELD_ID_POST => $postId,
+            Comment::FIELD_ID_USER => $userId,
+        ];
+        $toMany     = [
+            Comment::REL_EMOTIONS => ['3', '4'],
+        ];
+
         $crud = $this->createCrud(CommentsApi::class);
 
-        $parser   = $this->createCommentParserForUpdate();
-        $resource = $parser->parse($json);
-        $this->assertLessThanOrEqual(0, $parser->getErrors()->count());
-        $crud->update($commentId, $resource);
+        $crud->update($commentId, $attributes, $toMany);
         $this->assertNotNull($data = $crud->read($commentId)->getPaginatedData());
         $this->assertNotNull($model = $data->getData());
 
@@ -268,9 +200,9 @@ EOT;
         $this->assertNotEmpty($index = $model->{Comment::FIELD_ID});
 
         $includePaths = [
-            Comment::REL_USER,
-            Comment::REL_POST,
-            Comment::REL_EMOTIONS,
+            new IncludeParameter(CommentSchema::REL_USER, [Comment::REL_USER]),
+            new IncludeParameter(CommentSchema::REL_POST, [Comment::REL_POST]),
+            new IncludeParameter(CommentSchema::REL_EMOTIONS, [Comment::REL_EMOTIONS]),
         ];
         $this->assertNotNull($data = $crud->read($index, null, $includePaths));
         $this->assertNotNull($comment = $data->getPaginatedData()->getData());
@@ -308,13 +240,17 @@ EOT;
 
         $index        = 18;
         $s            = DocumentInterface::PATH_SEPARATOR;
+        $jsonPath1    = PostSchema::REL_COMMENTS . $s . CommentSchema::REL_EMOTIONS;
+        $modelPath1   = [Post::REL_COMMENTS, Comment::REL_EMOTIONS];
+        $jsonPath2    = PostSchema::REL_COMMENTS . $s . CommentSchema::REL_POST . $s . PostSchema::REL_USER;
+        $modelPath2   = [Post::REL_COMMENTS, Comment::REL_POST, Post::REL_USER];
         $includePaths = [
-            Post::REL_BOARD,
-            Post::REL_COMMENTS,
-            Post::REL_COMMENTS . $s . Comment::REL_EMOTIONS,
-            Post::REL_COMMENTS . $s . Comment::REL_POST . $s . Post::REL_USER,
+            new IncludeParameter(PostSchema::REL_BOARD, [Post::REL_BOARD]),
+            new IncludeParameter(PostSchema::REL_COMMENTS, [Post::REL_COMMENTS]),
+            new IncludeParameter($jsonPath1, $modelPath1),
+            new IncludeParameter($jsonPath2, $modelPath2),
         ];
-        $data = $crud->read($index, null, $includePaths);
+        $data         = $crud->read($index, null, $includePaths);
         $this->assertNotNull($data);
         $this->assertNotNull($model = $data->getPaginatedData()->getData());
         $this->assertFalse($data->getPaginatedData()->isCollection());
@@ -350,7 +286,7 @@ EOT;
         $this->assertSame(null, $emotions->getOffset());
         $this->assertSame(null, $emotions->getSize());
 
-        $comment = $comments[2];
+        $comment  = $comments[2];
         $emotions = $relationships->getRelationship($comment, Comment::REL_EMOTIONS);
         $this->assertCount(1, $emotions->getData());
         $this->assertFalse($emotions->hasMoreItems());
@@ -373,26 +309,36 @@ EOT;
         $crud = $this->createCrud(PostsApi::class);
         $s    = DocumentInterface::PATH_SEPARATOR;
 
+        $jsonPath1    = PostSchema::REL_COMMENTS . $s . CommentSchema::REL_EMOTIONS;
+        $modelPath1   = [Post::REL_COMMENTS, Comment::REL_EMOTIONS];
+        $jsonPath2    = PostSchema::REL_COMMENTS . $s . CommentSchema::REL_POST . $s . PostSchema::REL_USER;
+        $modelPath2   = [Post::REL_COMMENTS, Comment::REL_POST, Post::REL_USER];
         $includePaths = [
-            Post::REL_BOARD,
-            Post::REL_COMMENTS,
-            Post::REL_COMMENTS . $s . Comment::REL_EMOTIONS,
-            Post::REL_COMMENTS . $s . Comment::REL_POST . $s . Post::REL_USER,
+            new IncludeParameter(PostSchema::REL_BOARD, [Post::REL_BOARD]),
+            new IncludeParameter(PostSchema::REL_COMMENTS, [Post::REL_COMMENTS]),
+            new IncludeParameter($jsonPath1, $modelPath1),
+            new IncludeParameter($jsonPath2, $modelPath2),
         ];
-        $sortParameters   = [
-            Post::FIELD_ID_BOARD => false,
-            Post::FIELD_TITLE    => true,
+
+        $relType1       = RelationshipTypes::BELONGS_TO;
+        $sortParameters = [
+            $this->createSortParameter(PostSchema::REL_BOARD, Post::REL_BOARD, false, true, $relType1),
+            $this->createSortParameter(PostSchema::ATTR_TITLE, Post::FIELD_TITLE, true),
         ];
-        $pagingOffset     = 1;
-        $pagingSize       = 2;
-        $pagingParameters = [
+        $pagingOffset        = 1;
+        $pagingSize          = 2;
+        $pagingParameters    = [
             PaginationStrategyInterface::PARAM_PAGING_SKIP => $pagingOffset,
             PaginationStrategyInterface::PARAM_PAGING_SIZE => $pagingSize,
         ];
-        $filteringParameters = [
-            Post::FIELD_TITLE   => ['like' => ['%', '%']],
-            Post::FIELD_ID_USER => ['lt'   => '5'],
-        ];
+        $relType2 = RelationshipTypes::BELONGS_TO;
+        $filteringParameters = new FilterParameterCollection();
+        $filteringParameters->add(
+            new FilterParameter(PostSchema::ATTR_TITLE, Post::FIELD_TITLE, ['like' => ['%', '%']], false, null)
+        );
+        $filteringParameters->add(
+            new FilterParameter(PostSchema::REL_USER, Post::REL_USER, ['lt' => '5'], true, $relType2)
+        );
 
         $data = $crud->index($filteringParameters, $sortParameters, $includePaths, $pagingParameters);
 
@@ -432,9 +378,10 @@ EOT;
     {
         $crud = $this->createCrud(PostsApi::class);
 
+        $relType1         = RelationshipTypes::BELONGS_TO;
         $sortParameters   = [
-            Comment::FIELD_ID_USER => false,
-            Comment::FIELD_TEXT    => true,
+            $this->createSortParameter(CommentSchema::REL_USER, Comment::REL_USER, false, true, $relType1),
+            $this->createSortParameter(CommentSchema::ATTR_TEXT, Comment::FIELD_TEXT, true),
         ];
         $pagingOffset     = 1;
         $pagingSize       = 2;
@@ -442,10 +389,14 @@ EOT;
             PaginationStrategyInterface::PARAM_PAGING_SKIP => $pagingOffset,
             PaginationStrategyInterface::PARAM_PAGING_SIZE => $pagingSize,
         ];
-        $filterParameters = [
-            Comment::FIELD_ID_USER => ['lt'   => '5'],
-            Comment::FIELD_TEXT    => ['like' => '%'],
-        ];
+        $relType2         = RelationshipTypes::BELONGS_TO;
+        $filterParameters = new FilterParameterCollection();
+        $filterParameters->add(
+            new FilterParameter(CommentSchema::REL_USER, Comment::REL_USER, ['lt' => '5'], true, $relType2)
+        );
+        $filterParameters->add(
+            new FilterParameter(CommentSchema::ATTR_TEXT, Comment::FIELD_TEXT, ['like' => '%'], false, null)
+        );
 
         $data = $crud->readRelationship(
             1,
@@ -471,9 +422,10 @@ EOT;
     {
         $crud = $this->createCrud(UsersApi::class);
 
-        $filteringParameters = [
-            User::FIELD_IS_ACTIVE => ['eq' => '1'],
-        ];
+        $filteringParameters = new FilterParameterCollection();
+        $filteringParameters->add(
+            new FilterParameter(UserSchema::ATTR_IS_ACTIVE, User::FIELD_IS_ACTIVE, ['eq' => '1'], false, null)
+        );
 
         $data  = $crud->index($filteringParameters);
         $users = $data->getPaginatedData()->getData();
@@ -492,10 +444,11 @@ EOT;
     {
         $crud = $this->createCrud(PostsApi::class);
 
-        $index = 2;
-        $filteringParameters = [
-            Post::FIELD_ID => ['eq' => $index],
-        ];
+        $index               = 2;
+        $filteringParameters = new FilterParameterCollection();
+        $filteringParameters->add(
+            new FilterParameter(PostSchema::RESOURCE_ID, Post::FIELD_ID, ['eq' => $index], false, null)
+        );
 
         $data = $crud->index($filteringParameters);
 
@@ -512,9 +465,11 @@ EOT;
     {
         $crud = $this->createCrud(PostsApi::class);
 
-        $filteringParameters = [
-            Post::REL_USER => ['CCC'  => '5'],
-        ];
+        $relType = RelationshipTypes::BELONGS_TO;
+        $filteringParameters = new FilterParameterCollection();
+        $filteringParameters->add(
+            new FilterParameter(PostSchema::REL_USER, Post::REL_USER, ['CCC' => '5'], true, $relType)
+        );
 
         $exception = null;
         $gotError  = false;
@@ -528,34 +483,8 @@ EOT;
         $errors = $exception->getErrors();
         $this->assertCount(1, $errors);
 
-        $this->assertEquals('user', $errors[0]->getSource()[ErrorInterface::SOURCE_PARAMETER]);
+        $this->assertEquals('user-relationship', $errors[0]->getSource()[ErrorInterface::SOURCE_PARAMETER]);
         $this->assertEquals('ccc', $errors[0]->getDetail());
-    }
-
-    /**
-     * Test index
-     */
-    public function testIndexWithInvalidIncludePath()
-    {
-        $crud = $this->createCrud(PostsApi::class);
-
-        $includePaths = [
-            Post::REL_COMMENTS . '.XXX',
-        ];
-
-        $exception = null;
-        $gotError  = false;
-        try {
-            $crud->read(1, null, $includePaths);
-        } catch (JsonApiException $exception) {
-            $gotError = true;
-        }
-
-        $this->assertTrue($gotError);
-        $errors = $exception->getErrors();
-        $this->assertCount(1, $errors);
-
-        $this->assertEquals('XXX', $errors[0]->getSource()[ErrorInterface::SOURCE_PARAMETER]);
     }
 
     /**
@@ -565,6 +494,7 @@ EOT;
      */
     private function createCrud($class)
     {
+        $this->connection = $this->initDb();
         $factory          = new Factory();
         $translator       = $factory->createTranslator();
         $filterOperations = new FilterOperations($translator);
@@ -577,59 +507,30 @@ EOT;
         );
 
         $relPaging = new PaginationStrategy(self::DEFAULT_PAGE);
-        $crud      = new $class($factory, $repository, $modelSchemes, $relPaging, $translator);
+        $crud      = new $class($factory, $repository, $modelSchemes, $relPaging);
 
         return $crud;
     }
 
     /**
-     * @return ParserInterface
+     * @param string   $originalName
+     * @param string   $name
+     * @param bool     $isAscending
+     * @param bool     $isRelationship
+     * @param null|int $relationshipType
+     *
+     * @return SortParameterInterface
      */
-    private function createPostParserForCreate()
-    {
-        $factory        = new Factory();
-        $modelSchemes   = $this->getModelSchemes();
-        $translator     = $factory->createTranslator();
-        $checksOnCreate = new PostOnCreate(
-            $this->getJsonSchemes($modelSchemes),
-            $modelSchemes,
-            $factory->createTranslator()
-        );
+    private function createSortParameter(
+        $originalName,
+        $name,
+        $isAscending,
+        $isRelationship = false,
+        $relationshipType = null
+    ) {
+        $sortParam = new JsonLibrarySortParameter($originalName, $isAscending);
+        $result    = new SortParameter($sortParam, $name, $isRelationship, $relationshipType);
 
-        return $factory->createParser($checksOnCreate, $translator);
-    }
-
-    /**
-     * @return ParserInterface
-     */
-    private function createCommentParserForCreate()
-    {
-        $factory        = new Factory();
-        $modelSchemes   = $this->getModelSchemes();
-        $translator     = $factory->createTranslator();
-        $checksOnCreate = new CommentOnCreate(
-            $this->getJsonSchemes($modelSchemes),
-            $modelSchemes,
-            $factory->createTranslator()
-        );
-
-        return $factory->createParser($checksOnCreate, $translator);
-    }
-
-    /**
-     * @return ParserInterface
-     */
-    private function createCommentParserForUpdate()
-    {
-        $factory        = new Factory();
-        $modelSchemes   = $this->getModelSchemes();
-        $translator     = $factory->createTranslator();
-        $checksOnUpdate = new CommentOnUpdate(
-            $this->getJsonSchemes($modelSchemes),
-            $modelSchemes,
-            $factory->createTranslator()
-        );
-
-        return $factory->createParser($checksOnUpdate, $translator);
+        return $result;
     }
 }

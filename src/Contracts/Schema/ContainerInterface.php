@@ -31,4 +31,25 @@ interface ContainerInterface extends \Neomerx\JsonApi\Contracts\Schema\Container
      * @param RelationshipStorageInterface $storage
      */
     public function setRelationshipStorage(RelationshipStorageInterface $storage);
+
+    /**
+     * @inheritdoc
+     *
+     * @return SchemaInterface
+     */
+    public function getSchema($resourceObject);
+
+    /**
+     * @inheritdoc
+     *
+     * @return SchemaInterface
+     */
+    public function getSchemaByType($type);
+
+    /**
+     * @inheritdoc
+     *
+     * @return SchemaInterface
+     */
+    public function getSchemaByResourceType($resourceType);
 }

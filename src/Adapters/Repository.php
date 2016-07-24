@@ -21,7 +21,10 @@ use Doctrine\DBAL\Query\Expression\CompositeExpression;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
+use Limoncello\JsonApi\Contracts\Http\Query\FilterParameterInterface;
+use Limoncello\JsonApi\Contracts\Http\Query\SortParameterInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
+use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
 use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Models\RelationshipTypes;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
@@ -98,7 +101,7 @@ class Repository implements RepositoryInterface
 
         $valuesAsParams = [];
         foreach ($attributes as $column => $value) {
-            $valuesAsParams[$column] = $builder->createPositionalParameter((string)$value);
+            $valuesAsParams[$column] = $builder->createNamedParameter((string)$value);
         }
 
         $builder
@@ -145,11 +148,11 @@ class Repository implements RepositoryInterface
         $builder->update($table);
 
         foreach ($attributes as $name => $value) {
-            $builder->set($name, $builder->createPositionalParameter((string)$value));
+            $builder->set($name, $builder->createNamedParameter((string)$value));
         }
 
         $pkColumn = $this->buildTableColumn($table, $this->getPrimaryKeyName($modelClass));
-        $builder->where($pkColumn . '=' . $builder->createPositionalParameter($index));
+        $builder->where($pkColumn . '=' . $builder->createNamedParameter($index));
 
         return $builder;
     }
@@ -209,34 +212,124 @@ class Repository implements RepositoryInterface
     public function applySorting(QueryBuilder $builder, $modelClass, array $sortParams)
     {
         $table = $this->getTableName($modelClass);
-        foreach ($sortParams as $column => $isAscending) {
-            $builder->addOrderBy($this->buildTableColumn($table, $column), $isAscending === true ? 'ASC' : 'DESC');
+        foreach ($sortParams as $sortParam) {
+            /** @var SortParameterInterface $sortParam */
+            $column    = null;
+            if ($sortParam->isIsRelationship() === false) {
+                $column = $sortParam->getName();
+            } elseif ($sortParam->getRelationshipType() === RelationshipTypes::BELONGS_TO) {
+                $column = $this->getModelSchemes()->getForeignKey($modelClass, $sortParam->getName());
+            }
+
+            if ($column !== null) {
+                $builder->addOrderBy(
+                    $this->buildTableColumn($table, $column),
+                    $sortParam->isAscending() === true ? 'ASC' : 'DESC'
+                );
+            }
         }
     }
 
     /**
      * @inheritdoc
      */
-    public function applyFilters(ErrorCollection $errors, QueryBuilder $builder, $modelClass, array $filterParams)
-    {
-        $table = $this->getTableName($modelClass);
-        $linkWithAnd = $builder->expr()->andX();
+    public function applyFilters(
+        ErrorCollection $errors,
+        QueryBuilder $builder,
+        $modelClass,
+        FilterParameterCollection $filterParams
+    ) {
+        if ($filterParams->count() <= 0) {
+            return;
+        }
 
-        foreach ($filterParams as $field => $opAndParams) {
+        $whereLink = $filterParams->isWithAnd() === true ? $builder->expr()->andX() : $builder->expr()->orX();
+
+        // join tables need unique aliases. this index is used for making them.
+        $aliasId            = 0;
+        // while joining tables we select distinct rows. this flag used to apply `distinct` no more than once.
+        $hasAppliedDistinct = false;
+        $table              = $this->getTableName($modelClass);
+        $modelSchemes       = $this->getModelSchemes();
+        foreach ($filterParams as $filterParam) {
+            /** @var FilterParameterInterface $filterParam */
             // it should be array of 'operation' => parameters (string/array)
-            if (is_array($opAndParams) === false) {
+            if (is_array($filterParam->getValue()) === false) {
                 $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_PARAMETER);
-                $errors->addQueryParameterError($field, $errMsg);
+                $errors->addQueryParameterError($filterParam->getOriginalName(), $errMsg);
                 continue;
             }
 
-            foreach ($opAndParams as $operation => $params) {
+            foreach ($filterParam->getValue() as $operation => $params) {
+                $filterTable  = null;
+                $filterColumn = null;
                 $lcOp = strtolower((string)$operation);
-                $this->applyFilterToQuery($errors, $builder, $linkWithAnd, $table, $field, $lcOp, $params);
+
+                $aliasId++;
+
+                if ($filterParam->isIsRelationship() === true) {
+                    // param for relationship
+                    switch ($filterParam->getRelationshipType()) {
+                        case RelationshipTypes::BELONGS_TO:
+                            $filterTable  = $table;
+                            $filterColumn = $modelSchemes->getForeignKey($modelClass, $filterParam->getName());
+                            break;
+                        case RelationshipTypes::HAS_MANY:
+                            // here we join hasMany table and apply filter on its primary key
+                            list ($reverseClass, $reverseName) = $modelSchemes
+                                ->getReverseRelationship($modelClass, $filterParam->getName());
+                            $primaryKey    = $modelSchemes->getPrimaryKey($modelClass);
+                            $filterTable   = $modelSchemes->getTable($reverseClass);
+                            $filterColumn  = $modelSchemes->getPrimaryKey($reverseClass);
+                            $reverseFk     = $modelSchemes->getForeignKey($reverseClass, $reverseName);
+                            $aliased       = $filterTable . $aliasId;
+                            $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
+                                $this->buildTableColumn($aliased, $reverseFk);
+                            $builder->join($table, $filterTable, $aliased, $joinCondition);
+                            if ($hasAppliedDistinct === false) {
+                                $this->distinct($builder, $modelClass);
+                                $hasAppliedDistinct = true;
+                            }
+                            $filterTable = $aliased;
+                            break;
+                        case RelationshipTypes::BELONGS_TO_MANY:
+                            // here we join intermediate belongsToMany table and apply filter on its 2nd foreign key
+                            list ($filterTable, $reversePk , $filterColumn) = $modelSchemes
+                                ->getBelongsToManyRelationship($modelClass, $filterParam->getName());
+                            $primaryKey    = $modelSchemes->getPrimaryKey($modelClass);
+                            $aliased       = $filterTable . $aliasId;
+                            $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
+                                $this->buildTableColumn($aliased, $reversePk);
+                            $builder->innerJoin($table, $filterTable, $aliased, $joinCondition);
+                            if ($hasAppliedDistinct === false) {
+                                $this->distinct($builder, $modelClass);
+                                $hasAppliedDistinct = true;
+                            }
+                            $filterTable = $aliased;
+                            break;
+                    }
+                } else {
+                    // param for attribute
+                    $filterTable  = $table;
+                    $filterColumn = $filterParam->getName();
+                }
+
+                // here $filterTable and $filterColumn should always be not null (if not it's a bug in logic)
+
+                $this->applyFilterToQuery(
+                    $errors,
+                    $builder,
+                    $whereLink,
+                    $filterParam,
+                    $filterTable,
+                    $filterColumn,
+                    $lcOp,
+                    $params
+                );
             }
         }
 
-        $builder->andWhere($linkWithAnd);
+        $builder->andWhere($whereLink);
     }
 
     /**
@@ -356,23 +449,26 @@ class Repository implements RepositoryInterface
         return "`$table`.`$column`";
     }
 
-    /**
-     * @param ErrorCollection     $errors
-     * @param QueryBuilder        $builder
-     * @param CompositeExpression $link
-     * @param string              $table
-     * @param string              $field
-     * @param string              $operation
-     * @param array|string|null   $params
+    /** @noinspection PhpTooManyParametersInspection
+     * @param ErrorCollection          $errors
+     * @param QueryBuilder             $builder
+     * @param CompositeExpression      $link
+     * @param FilterParameterInterface $filterParam
+     * @param string                   $table
+     * @param string                   $field
+     * @param string                   $operation
+     * @param array|string|null        $params
      *
      * @return void
      *
+     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     protected function applyFilterToQuery(
         ErrorCollection $errors,
         QueryBuilder $builder,
         CompositeExpression $link,
+        FilterParameterInterface $filterParam,
         $table,
         $field,
         $operation,
@@ -439,9 +535,25 @@ class Repository implements RepositoryInterface
                 break;
             default:
                 $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_OPERATION);
-                $errors->addQueryParameterError($field, $errMsg, $operation);
+                $errors->addQueryParameterError($filterParam->getOriginalName(), $errMsg, $operation);
                 break;
         }
+    }
+
+    /**
+     * @param QueryBuilder $builder
+     * @param string       $modelClass
+     *
+     * @return QueryBuilder
+     */
+    protected function distinct(QueryBuilder $builder, $modelClass)
+    {
+        // emulate SELECT DISTINCT (group by primary key)
+        $primaryColumn     = $this->getModelSchemes()->getPrimaryKey($modelClass);
+        $fullPrimaryColumn = $this->getColumn($modelClass, $this->getTableName($modelClass), $primaryColumn);
+        $builder->addGroupBy($fullPrimaryColumn);
+
+        return $builder;
     }
 
     /**

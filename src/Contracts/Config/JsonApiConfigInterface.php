@@ -46,6 +46,18 @@ interface JsonApiConfigInterface
     const KEY_JSON_URL_PREFIX = self::KEY_JSON_VERSION_META + 1;
 
     /**
+     * @return array
+     */
+    public function getModelSchemaMap();
+
+    /**
+     * @param array $modelSchemaMap
+     *
+     * @return $this
+     */
+    public function setModelSchemaMap(array $modelSchemaMap);
+
+    /**
      * @return int
      */
     public function getJsonEncodeOptions();
@@ -58,11 +70,21 @@ interface JsonApiConfigInterface
     public function setJsonEncodeOptions($options);
 
     /**
+     * @return int
+     */
+    public function getJsonEncodeDepth();
+
+    /**
      * @param int $depth
      *
      * @return $this
      */
     public function setJsonEncodeDepth($depth);
+
+    /**
+     * @return boolean
+     */
+    public function isShowVersion();
 
     /**
      * @return $this
@@ -75,6 +97,11 @@ interface JsonApiConfigInterface
     public function setHideVersion();
 
     /**
+     * @return mixed
+     */
+    public function getMeta();
+
+    /**
      * @param mixed $meta
      *
      * @return $this
@@ -82,11 +109,21 @@ interface JsonApiConfigInterface
     public function setMeta($meta);
 
     /**
+     * @return string
+     */
+    public function getUriPrefix();
+
+    /**
      * @param string $prefix
      *
      * @return $this
      */
     public function setUriPrefix($prefix);
+
+    /**
+     * @return int
+     */
+    public function getRelationshipPagingSize();
 
     /**
      * @param int $size
@@ -99,4 +136,11 @@ interface JsonApiConfigInterface
      * @return array
      */
     public function getConfig();
+
+    /**
+     * @param array $data
+     *
+     * @return JsonApiConfigInterface
+     */
+    public function setConfig(array $data);
 }

@@ -21,7 +21,6 @@ use Limoncello\JsonApi\Api\Crud;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
-use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
 use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Tests\JsonApi\Data\Models\Model;
 
@@ -40,23 +39,21 @@ abstract class AppCrud extends Crud
         FactoryInterface $factory,
         RepositoryInterface $repository,
         SchemaStorageInterface $modelSchemes,
-        PaginationStrategyInterface $paginationStrategy,
-        T $translator
+        PaginationStrategyInterface $paginationStrategy
     ) {
         parent::__construct(
             $factory,
             static::MODEL_CLASS,
             $repository,
             $modelSchemes,
-            $paginationStrategy,
-            $translator
+            $paginationStrategy
         );
     }
 
     /**
      * @inheritdoc
      */
-    protected function filterAttributesOnCreate($modelClass, $attributes)
+    protected function filterAttributesOnCreate($modelClass, array $attributes)
     {
         $allowedChanges = parent::filterAttributesOnCreate($modelClass, $attributes);
 
@@ -68,7 +65,7 @@ abstract class AppCrud extends Crud
     /**
      * @inheritdoc
      */
-    protected function filterAttributesOnUpdate($modelClass, $attributes)
+    protected function filterAttributesOnUpdate($modelClass, array $attributes)
     {
         $allowedChanges = parent::filterAttributesOnUpdate($modelClass, $attributes);
 
@@ -80,9 +77,9 @@ abstract class AppCrud extends Crud
     /**
      * @inheritdoc
      */
-    protected function builderSaveRelationshipOnCreate(QueryBuilder $builder)
+    protected function builderSaveRelationshipOnCreate($relationshipName, QueryBuilder $builder)
     {
-        $builder = parent::builderSaveRelationshipOnCreate($builder);
+        $builder = parent::builderSaveRelationshipOnCreate($relationshipName, $builder);
 
         $builder->setValue(Model::FIELD_CREATED_AT, $builder->createNamedParameter(date('Y-m-d H:i:s')));
 
@@ -92,9 +89,9 @@ abstract class AppCrud extends Crud
     /**
      * @inheritdoc
      */
-    protected function builderSaveRelationshipOnUpdate(QueryBuilder $builder)
+    protected function builderSaveRelationshipOnUpdate($relationshipName, QueryBuilder $builder)
     {
-        $builder = parent::builderSaveRelationshipOnUpdate($builder);
+        $builder = parent::builderSaveRelationshipOnUpdate($relationshipName, $builder);
 
         $builder->setValue(Model::FIELD_CREATED_AT, $builder->createNamedParameter(date('Y-m-d H:i:s')));
 
