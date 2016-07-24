@@ -5,7 +5,7 @@
 [![HHVM](https://img.shields.io/hhvm/limoncello-php/json-api.svg)](https://travis-ci.org/limoncello-php/json-api)
 [![License](https://img.shields.io/packagist/l/limoncello-php/json-api.svg)](https://packagist.org/packages/limoncello-php/json-api)
 
-Supporting classes for json-api. 
+This component adds [JSON API support](https://github.com/neomerx/json-api) and provides a range of classes for JSON input data parsing, validation, create/read/update/delete operations and forming [JSON API](http://jsonapi.org/) responses. Out-of-the-box it supports input data filters, sorting, pagination, resource inclusion and sparse field sets (see [JSON API spec for details](http://jsonapi.org/format/#fetching)).
 
 This is a part of [Limoncello Framework](https://github.com/limoncello-php/framework).
 
