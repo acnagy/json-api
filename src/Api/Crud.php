@@ -27,10 +27,10 @@ use Limoncello\JsonApi\Contracts\Api\CrudInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\Http\Query\IncludeParameterInterface;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\Contracts\ModelStorageInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Models\Contracts\TagStorageInterface;
 use Limoncello\Models\RelationshipTypes;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
@@ -40,6 +40,7 @@ use Neomerx\JsonApi\Exceptions\JsonApiException as E;
 /**
  * @package Limoncello\JsonApi
  *
+ * @SuppressWarnings(PHPMD.TooManyMethods)
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  */
@@ -70,7 +71,7 @@ class Crud implements CrudInterface
     private $repository;
 
     /**
-     * @var SchemaStorageInterface
+     * @var ModelSchemesInterface
      */
     private $modelSchemes;
 
@@ -83,14 +84,14 @@ class Crud implements CrudInterface
      * @param FactoryInterface            $factory
      * @param string                      $modelClass
      * @param RepositoryInterface         $repository
-     * @param SchemaStorageInterface      $modelSchemes
+     * @param ModelSchemesInterface       $modelSchemes
      * @param PaginationStrategyInterface $paginationStrategy
      */
     public function __construct(
         FactoryInterface $factory,
         $modelClass,
         RepositoryInterface $repository,
-        SchemaStorageInterface $modelSchemes,
+        ModelSchemesInterface $modelSchemes,
         PaginationStrategyInterface $paginationStrategy
     ) {
         $this->factory            = $factory;
@@ -300,7 +301,7 @@ class Crud implements CrudInterface
     }
 
     /**
-     * @return SchemaStorageInterface
+     * @return ModelSchemesInterface
      */
     protected function getModelSchemes()
     {

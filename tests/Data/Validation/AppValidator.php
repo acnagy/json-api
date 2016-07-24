@@ -18,9 +18,9 @@
 
 use Doctrine\DBAL\Connection;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as JsonApiTranslatorInterface;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as JsonSchemesContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Validation\Validator;
-use Limoncello\Models\Contracts\SchemaStorageInterface as ModelSchemesContainerInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
 use Limoncello\Tests\JsonApi\Data\Models\Post;
 use Limoncello\Tests\JsonApi\Data\Models\Role;
@@ -39,17 +39,17 @@ class AppValidator extends Validator
     private $connection;
 
     /**
-     * @param JsonApiTranslatorInterface     $jsonApiTranslator
-     * @param ValidationTranslatorInterface  $validationTranslator
-     * @param JsonSchemesContainerInterface  $jsonSchemes
-     * @param ModelSchemesContainerInterface $modelSchemes
-     * @param Connection                     $connection
+     * @param JsonApiTranslatorInterface    $jsonApiTranslator
+     * @param ValidationTranslatorInterface $validationTranslator
+     * @param JsonSchemesInterface          $jsonSchemes
+     * @param ModelSchemesInterface         $modelSchemes
+     * @param Connection                    $connection
      */
     public function __construct(
         JsonApiTranslatorInterface $jsonApiTranslator,
         ValidationTranslatorInterface $validationTranslator,
-        JsonSchemesContainerInterface $jsonSchemes,
-        ModelSchemesContainerInterface $modelSchemes,
+        JsonSchemesInterface $jsonSchemes,
+        ModelSchemesInterface $modelSchemes,
         Connection $connection
     ) {
         $this->connection      = $connection;

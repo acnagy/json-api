@@ -17,20 +17,38 @@
  */
 
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
+use Neomerx\JsonApi\Contracts\Schema\ContainerInterface;
 
 /**
  * @package Limoncello\JsonApi
  */
-interface ContainerInterface extends \Neomerx\JsonApi\Contracts\Schema\ContainerInterface
+interface JsonSchemesInterface extends ContainerInterface
 {
     /**
      * @return RelationshipStorageInterface
      */
     public function getRelationshipStorage();
+
     /**
      * @param RelationshipStorageInterface $storage
      */
     public function setRelationshipStorage(RelationshipStorageInterface $storage);
+
+    /**
+     * @param string $schemaClass
+     * @param string $relationshipName
+     *
+     * @return SchemaInterface
+     */
+    public function getRelationshipSchema($schemaClass, $relationshipName);
+
+    /**
+     * @param string $modelClass
+     * @param string $relationshipName
+     *
+     * @return SchemaInterface
+     */
+    public function getModelRelationshipSchema($modelClass, $relationshipName);
 
     /**
      * @inheritdoc

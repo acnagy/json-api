@@ -20,13 +20,13 @@ use Limoncello\JsonApi\Contracts\Http\Query\FilterParameterInterface;
 use Limoncello\JsonApi\Contracts\Http\Query\IncludeParameterInterface;
 use Limoncello\JsonApi\Contracts\Http\Query\SortParameterInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
 use Limoncello\JsonApi\Http\Query\FilterParameter;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
 use Limoncello\JsonApi\Http\Query\IncludeParameter;
 use Limoncello\JsonApi\Http\Query\SortParameter;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\RelationshipTypes;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
@@ -35,13 +35,21 @@ use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  */
 class QueryTransformer
 {
     /**
      * @var string
      */
-    private $modelClass;
+    private $currentModelClass;
+
+    /**
+     * @var string
+     */
+    private $currentSchemaClass;
 
     /**
      * @var array
@@ -54,7 +62,7 @@ class QueryTransformer
     private $relMappings;
 
     /**
-     * @var SchemaStorageInterface
+     * @var ModelSchemesInterface
      */
     private $modelSchemes;
 
@@ -64,7 +72,7 @@ class QueryTransformer
     private $isRootSchemaSet = false;
 
     /**
-     * @var ContainerInterface
+     * @var JsonSchemesInterface
      */
     private $jsonSchemes;
 
@@ -79,14 +87,14 @@ class QueryTransformer
     private $schemaClass;
 
     /**
-     * @param SchemaStorageInterface $modelSchemes
-     * @param ContainerInterface     $jsonSchemes
-     * @param T                      $translator
-     * @param string                 $schemaClass
+     * @param ModelSchemesInterface $modelSchemes
+     * @param JsonSchemesInterface  $jsonSchemes
+     * @param T                     $translator
+     * @param string                $schemaClass
      */
     public function __construct(
-        SchemaStorageInterface $modelSchemes,
-        ContainerInterface $jsonSchemes,
+        ModelSchemesInterface $modelSchemes,
+        JsonSchemesInterface $jsonSchemes,
         T $translator,
         $schemaClass
     ) {
@@ -117,6 +125,8 @@ class QueryTransformer
      * @param array|null      $parameters
      *
      * @return null|FilterParameterCollection[]
+     *
+     * @SuppressWarnings(PHPMD.ElseExpression)
      */
     protected function mapFilterParameters(ErrorCollection $errors, array $parameters = null)
     {
@@ -216,14 +226,14 @@ class QueryTransformer
 
         $mappedParam = null;
         if ($this->isId($jsonName) === true) {
-            $column      = $this->getModelSchemes()->getPrimaryKey($this->getModelClass());
+            $column      = $this->getModelSchemes()->getPrimaryKey($this->getCurrentModelClass());
             $mappedParam = $this->createFilterAttributeParameter(DocumentInterface::KEYWORD_ID, $column, $value);
         } elseif ($this->canMapAttribute($jsonName) === true) {
             $column      = $this->getAttributeMappings()[$jsonName];
             $mappedParam = $this->createFilterAttributeParameter($jsonName, $column, $value);
         } elseif ($this->canMapRelationship($jsonName) === true) {
             $modelName   = $this->getRelationshipMappings()[$jsonName];
-            $type        =  $this->getModelSchemes()->getRelationshipType($this->getModelClass(), $modelName);
+            $type        =  $this->getModelSchemes()->getRelationshipType($this->getCurrentModelClass(), $modelName);
             $mappedParam = $this->createFilterRelationshipParameter($jsonName, $modelName, $value, $type);
         }
 
@@ -242,14 +252,14 @@ class QueryTransformer
         $mappedParam = null;
         $jsonName    = $sortParameter->getField();
         if ($this->isId($jsonName) === true) {
-            $column      = $this->getModelSchemes()->getPrimaryKey($this->getModelClass());
+            $column      = $this->getModelSchemes()->getPrimaryKey($this->getCurrentModelClass());
             $mappedParam = $this->createSortAttributeParameter($sortParameter, $column);
         } elseif ($this->canMapAttribute($jsonName) === true) {
             $column      = $this->getAttributeMappings()[$jsonName];
             $mappedParam = $this->createSortAttributeParameter($sortParameter, $column);
         } elseif ($this->canMapRelationship($jsonName) === true) {
             $modelName = $this->getRelationshipMappings()[$jsonName];
-            $type      = $this->getModelSchemes()->getRelationshipType($this->getModelClass(), $modelName);
+            $type      = $this->getModelSchemes()->getRelationshipType($this->getCurrentModelClass(), $modelName);
             if ($type === RelationshipTypes::BELONGS_TO) {
                 $mappedParam = $this->createSortRelationshipParameter($sortParameter, $modelName, $type);
             }
@@ -267,18 +277,14 @@ class QueryTransformer
     {
         $this->resetSchema();
 
-        $curModelClass = $this->getModelClass();
-        $pathItems     = explode(DocumentInterface::PATH_SEPARATOR, $path);
+        $pathItems = explode(DocumentInterface::PATH_SEPARATOR, $path);
 
         $modelRelationships = [];
         foreach ($pathItems as $jsonName) {
             if ($this->canMapRelationship($jsonName) === true) {
-                $modelName            = $this->getRelationshipMappings()[$jsonName];
-                $modelRelationships[] = $modelName;
-
-                list($curModelClass) = $this->getModelSchemes()->getReverseRelationship($curModelClass, $modelName);
-                $nextSchema = $this->getJsonSchemes()->getSchemaByType($curModelClass);
-                $this->setSchema(get_class($nextSchema));
+                $modelRelationships[] = $this->getRelationshipMappings()[$jsonName];
+                $nextSchema = $this->getJsonSchemes()->getRelationshipSchema($this->getCurrentSchemaClass(), $jsonName);
+                $this->setCurrentSchema(get_class($nextSchema));
 
                 continue;
             }
@@ -414,13 +420,21 @@ class QueryTransformer
     /**
      * @return string
      */
-    protected function getModelClass()
+    protected function getCurrentModelClass()
     {
-        return $this->modelClass;
+        return $this->currentModelClass;
     }
 
     /**
-     * @return SchemaStorageInterface
+     * @return string
+     */
+    protected function getCurrentSchemaClass()
+    {
+        return $this->currentSchemaClass;
+    }
+
+    /**
+     * @return ModelSchemesInterface
      */
     protected function getModelSchemes()
     {
@@ -428,7 +442,7 @@ class QueryTransformer
     }
 
     /**
-     * @return ContainerInterface
+     * @return JsonSchemesInterface
      */
     protected function getJsonSchemes()
     {
@@ -454,13 +468,15 @@ class QueryTransformer
     /**
      * @inheritdoc
      */
-    protected function setSchema($schemaClassName)
+    protected function setCurrentSchema($currentSchemaClass)
     {
-        /** @var SchemaInterface $schemaClassName */
+        $this->currentSchemaClass = $currentSchemaClass;
 
-        $this->modelClass = $schemaClassName::MODEL;
+        /** @var SchemaInterface $currentSchemaClass */
 
-        $mappings           = $schemaClassName::getMappings();
+        $this->currentModelClass = $currentSchemaClass::MODEL;
+
+        $mappings           = $currentSchemaClass::getMappings();
         $this->attrMappings = array_key_exists(SchemaInterface::SCHEMA_ATTRIBUTES, $mappings) === true ?
             $mappings[SchemaInterface::SCHEMA_ATTRIBUTES] : [];
         $this->relMappings  = array_key_exists(SchemaInterface::SCHEMA_RELATIONSHIPS, $mappings) === true ?
@@ -475,7 +491,7 @@ class QueryTransformer
     private function resetSchema()
     {
         if ($this->isRootSchemaSet === false) {
-            $this->setSchema($this->getSchemaClass());
+            $this->setCurrentSchema($this->getSchemaClass());
             $this->isRootSchemaSet = true;
         }
     }

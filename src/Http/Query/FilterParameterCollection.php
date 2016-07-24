@@ -25,6 +25,8 @@ use Serializable;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.TooManyPublicMethods)
  */
 class FilterParameterCollection implements IteratorAggregate, ArrayAccess, Serializable, Countable
 {

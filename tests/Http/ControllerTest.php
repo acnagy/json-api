@@ -28,10 +28,10 @@ use Limoncello\JsonApi\Contracts\Config\JsonApiConfigInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as JsonSchemesContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Factory;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface as ModelSchemesContainerInterface;
 use Limoncello\Tests\JsonApi\Data\Api\CommentsApi;
 use Limoncello\Tests\JsonApi\Data\Http\BoardsController;
 use Limoncello\Tests\JsonApi\Data\Http\CommentsController;
@@ -40,6 +40,7 @@ use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\CommentEmotion;
 use Limoncello\Tests\JsonApi\Data\Schemes\BoardSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\EmotionSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\UserSchema;
 use Limoncello\Tests\JsonApi\Data\Validation\AppValidator;
 use Limoncello\Tests\JsonApi\TestCase;
@@ -86,6 +87,48 @@ class ControllerTest extends TestCase
             urldecode($resource[DocumentInterface::KEYWORD_LINKS][DocumentInterface::KEYWORD_NEXT])
         );
         $this->assertCount(10, $resource[DocumentInterface::KEYWORD_DATA]);
+    }
+
+    /**
+     * Controller test.
+     */
+    public function testIndexSortByIdDesc()
+    {
+        $routeParams = [];
+        $container   = $this->createContainer();
+        $queryParams = [
+            'sort' => '-' . CommentSchema::RESOURCE_ID,
+        ];
+        /** @var Mock $request */
+        $request = Mockery::mock(ServerRequestInterface::class);
+        $request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn($queryParams);
+        $uri = new Uri('http://localhost.local/comments?' . http_build_query($queryParams));
+        $request->shouldReceive('getUri')->once()->withNoArgs()->andReturn($uri);
+
+        /** @var ServerRequestInterface $request */
+
+        $response = CommentsController::index($routeParams, $container, $request);
+        $this->assertNotNull($response);
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $body     = (string)($response->getBody());
+        $resource = json_decode($body, true);
+
+        $this->assertEquals(
+            'http://localhost.local/comments?sort=-id&page[skip]=10&page[size]=10',
+            urldecode($resource[DocumentInterface::KEYWORD_LINKS][DocumentInterface::KEYWORD_NEXT])
+        );
+        $this->assertCount(10, $resources = $resource[DocumentInterface::KEYWORD_DATA]);
+
+        // check IDs are in descending order
+        $allDesc = true;
+        for ($index = 1; $index < count($resources); $index++) {
+            if ($resources[$index]['id'] > $resources[$index - 1]['id']) {
+                $allDesc = false;
+                break;
+            }
+        }
+        $this->assertTrue($allDesc);
     }
 
     /**
@@ -221,6 +264,37 @@ class ControllerTest extends TestCase
     /**
      * Controller test.
      */
+    public function testIndexWithInvalidParameters()
+    {
+        $routeParams = [];
+        $queryParams = [
+            'filter' => ['aaa' => ['in' => ['10', '11']]],
+            'sort'    => 'bbb',
+            'include' => 'ccc',
+        ];
+        $container   = $this->createContainer();
+        /** @var Mock $request */
+        $request = Mockery::mock(ServerRequestInterface::class);
+        $request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn($queryParams);
+
+        /** @var ServerRequestInterface $request */
+
+        $exception = null;
+        try {
+            CommentsController::index($routeParams, $container, $request);
+        } catch (JsonApiException $exception) {
+        }
+        $this->assertNotNull($exception);
+
+        $this->assertCount(3, $errors = $exception->getErrors());
+        $this->assertEquals(['parameter' => 'aaa'], $errors[0]->getSource());
+        $this->assertEquals(['parameter' => 'bbb'], $errors[1]->getSource());
+        $this->assertEquals(['parameter' => 'ccc'], $errors[2]->getSource());
+    }
+
+    /**
+     * Controller test.
+     */
     public function testPaginationInRelationship()
     {
         $routeParams = [];
@@ -258,6 +332,36 @@ class ControllerTest extends TestCase
         $this->assertTrue(isset($resource['data'][2]['relationships']['posts-relationship']['links']['next']));
         $link = $resource['data'][2]['relationships']['posts-relationship']['links']['next'];
         $this->assertEquals('/boards/3/relationships/posts-relationship?skip=3&size=3', $link);
+    }
+
+    /**
+     * Controller test.
+     */
+    public function testReadToOneRelationship()
+    {
+        $routeParams = [CommentsController::ROUTE_KEY_INDEX => '2'];
+        $queryParams = [];
+        $container   = $this->createContainer();
+        $uri         = new Uri('http://localhost.local/comments/2/users?' . http_build_query($queryParams));
+        /** @var Mock $request */
+        $request = Mockery::mock(ServerRequestInterface::class);
+        $request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn($queryParams);
+        $request->shouldReceive('getUri')->once()->withNoArgs()->andReturn($uri);
+
+        /** @var ServerRequestInterface $request */
+
+        // replace paging strategy to get paginated results in the relationship
+        $container[PaginationStrategyInterface::class] = new PaginationStrategy(3);
+
+        $response = CommentsController::readUser($routeParams, $container, $request);
+        $this->assertNotNull($response);
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $body     = (string)($response->getBody());
+        $resource = json_decode($body, true);
+
+        $this->assertNotEmpty(3, $resource);
+        $this->assertEquals(5, $resource['data']['id']);
     }
 
     /**
@@ -470,7 +574,6 @@ EOT;
         /** @var Mock $request */
         $request = Mockery::mock(ServerRequestInterface::class);
         $request->shouldReceive('getBody')->once()->withNoArgs()->andReturn($jsonInput);
-        //$request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn([]);
         $request->shouldReceive('getUri')->once()->withNoArgs()->andReturn(new Uri('http://localhost.local/comments'));
 
         /** @var ServerRequestInterface $request */
@@ -503,6 +606,32 @@ EOT;
             [[CommentEmotion::FIELD_ID_EMOTION => '2'], [CommentEmotion::FIELD_ID_EMOTION => '3']],
             $emotionIds
         );
+    }
+
+    /**
+     * Controller test.
+     */
+    public function testSendInvalidInput()
+    {
+        $index     = '1';
+        $jsonInput = '{';
+
+        $routeParams = [CommentsController::ROUTE_KEY_INDEX => $index];
+        /** @var Mock $request */
+        $request = Mockery::mock(ServerRequestInterface::class);
+        $request->shouldReceive('getBody')->once()->withNoArgs()->andReturn($jsonInput);
+
+        /** @var ServerRequestInterface $request */
+
+        $exception  = null;
+        try {
+            CommentsController::update($routeParams, $this->createContainer(), $request);
+        } catch (JsonApiException $exception) {
+        }
+        $this->assertNotNull($exception);
+
+        $this->assertCount(1, $errors = $exception->getErrors());
+        $this->assertEquals(['pointer' => '/data'], $errors[0]->getSource());
     }
 
     /**
@@ -552,11 +681,14 @@ EOT;
     {
         $index       = '2';
         $routeParams = [CommentsController::ROUTE_KEY_INDEX => $index];
+        $queryParams = [
+            'sort' => '+' . EmotionSchema::ATTR_NAME,
+        ];
         $container   = $this->createContainer();
         /** @var Mock $request */
         $request = Mockery::mock(ServerRequestInterface::class);
-        $request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn([]);
-        $uri = new Uri('http://localhost.local/comments/relationships/emotions');
+        $request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn($queryParams);
+        $uri = new Uri('http://localhost.local/comments/relationships/emotions?' . http_build_query($queryParams));
         $request->shouldReceive('getUri')->once()->withNoArgs()->andReturn($uri);
 
         /** @var ServerRequestInterface $request */
@@ -569,11 +701,51 @@ EOT;
         $resource = json_decode($body, true);
 
         $this->assertCount(4, $resource[DocumentInterface::KEYWORD_DATA]);
-        // manually checked that emotions should have these ids.
-        $this->assertEquals('2', $resource['data'][0]['id']);
-        $this->assertEquals('3', $resource['data'][1]['id']);
-        $this->assertEquals('4', $resource['data'][2]['id']);
-        $this->assertEquals('5', $resource['data'][3]['id']);
+        // manually checked that emotions should have these ids and sorted by name in ascending order.
+        $this->assertEquals('4', $resource['data'][0]['id']);
+        $this->assertEquals('5', $resource['data'][1]['id']);
+        $this->assertEquals('3', $resource['data'][2]['id']);
+        $this->assertEquals('2', $resource['data'][3]['id']);
+    }
+
+    /**
+     * Controller test.
+     */
+    public function testReadRelationshipIdentifiers()
+    {
+        $index       = '2';
+        $routeParams = [CommentsController::ROUTE_KEY_INDEX => $index];
+        $queryParams = [
+            'sort' => '+' . EmotionSchema::ATTR_NAME,
+        ];
+        $container   = $this->createContainer();
+        /** @var Mock $request */
+        $request = Mockery::mock(ServerRequestInterface::class);
+        $request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn($queryParams);
+        $uri = new Uri('http://localhost.local/comments/relationships/emotions?' . http_build_query($queryParams));
+        $request->shouldReceive('getUri')->once()->withNoArgs()->andReturn($uri);
+
+        /** @var ServerRequestInterface $request */
+
+        $response = CommentsController::readEmotionsIdentifiers($routeParams, $container, $request);
+        $this->assertNotNull($response);
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $body     = (string)($response->getBody());
+        $resource = json_decode($body, true);
+
+        $this->assertCount(4, $resource[DocumentInterface::KEYWORD_DATA]);
+        // manually checked that emotions should have these ids and sorted by name in ascending order.
+        $this->assertEquals('4', $resource['data'][0]['id']);
+        $this->assertEquals('5', $resource['data'][1]['id']);
+        $this->assertEquals('3', $resource['data'][2]['id']);
+        $this->assertEquals('2', $resource['data'][3]['id']);
+
+        // check we have only IDs in response (no attributes)
+        $this->assertArrayNotHasKey(DocumentInterface::KEYWORD_ATTRIBUTES, $resource['data'][0]);
+        $this->assertArrayNotHasKey(DocumentInterface::KEYWORD_ATTRIBUTES, $resource['data'][1]);
+        $this->assertArrayNotHasKey(DocumentInterface::KEYWORD_ATTRIBUTES, $resource['data'][2]);
+        $this->assertArrayNotHasKey(DocumentInterface::KEYWORD_ATTRIBUTES, $resource['data'][3]);
     }
 
     /**
@@ -584,18 +756,17 @@ EOT;
         $container = new Container();
 
         $container[FactoryInterface::class]               = $factory = new Factory();
-        $container[QueryParametersParserInterface::class] = $factory->getJsonApiFactory()
-            ->createQueryParametersParser();
-        $container[ModelSchemesContainerInterface::class] = $modelSchemes = $this->getModelSchemes();
+        $container[QueryParametersParserInterface::class] = $factory
+            ->getJsonApiFactory()->createQueryParametersParser();
+        $container[ModelSchemesInterface::class]       = $modelSchemes = $this->getModelSchemes();
         /** @var RelationshipStorageInterface $storage */
-        $storage                                          = null;
-        $container[JsonSchemesContainerInterface::class]  = $jsonSchemes = $this
-            ->getJsonSchemes($modelSchemes, $storage);
-        $container[Connection::class]                     = $connection = $this->initDb();
-        $container[TranslatorInterface::class]            = $translator = $factory->createTranslator();
-        $container[FilterOperationsInterface::class]      = $filterOperations = new FilterOperations($translator);
-        $container[PaginationStrategyInterface::class]    = new PaginationStrategy(10);
-        $container[RepositoryInterface::class]            = $repository = $factory->createRepository(
+        $storage                                       = null;
+        $container[JsonSchemesInterface::class]        = $jsonSchemes = $this->getJsonSchemes($modelSchemes, $storage);
+        $container[Connection::class]                  = $connection = $this->initDb();
+        $container[TranslatorInterface::class]         = $translator = $factory->createTranslator();
+        $container[FilterOperationsInterface::class]   = $filterOperations = new FilterOperations($translator);
+        $container[PaginationStrategyInterface::class] = new PaginationStrategy(10);
+        $container[RepositoryInterface::class]         = $repository = $factory->createRepository(
             $connection,
             $modelSchemes,
             $filterOperations,

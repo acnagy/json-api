@@ -20,7 +20,7 @@ use Closure;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
@@ -35,7 +35,7 @@ use Psr\Http\Message\UriInterface;
 class Encoder extends \Neomerx\JsonApi\Encoder\Encoder implements EncoderInterface
 {
     /**
-     * @var ContainerInterface
+     * @var JsonSchemesInterface
      */
     private $schemesContainer;
 
@@ -45,13 +45,13 @@ class Encoder extends \Neomerx\JsonApi\Encoder\Encoder implements EncoderInterfa
     private $originalUri;
 
     /**
-     * @param FactoryInterface    $factory
-     * @param ContainerInterface  $container
-     * @param EncoderOptions|null $encoderOptions
+     * @param FactoryInterface     $factory
+     * @param JsonSchemesInterface $container
+     * @param EncoderOptions|null  $encoderOptions
      */
     public function __construct(
         FactoryInterface $factory,
-        ContainerInterface $container,
+        JsonSchemesInterface $container,
         EncoderOptions $encoderOptions = null
     ) {
         parent::__construct($factory, $container, $encoderOptions);
@@ -85,7 +85,7 @@ class Encoder extends \Neomerx\JsonApi\Encoder\Encoder implements EncoderInterfa
     }
 
     /**
-     * @return ContainerInterface
+     * @return JsonSchemesInterface
      */
     protected function getSchemesContainer()
     {
@@ -136,17 +136,13 @@ class Encoder extends \Neomerx\JsonApi\Encoder\Encoder implements EncoderInterfa
             (0 < $data->getOffset() || $data->hasMoreItems() === true) &&
             $this->getOriginalUri() !== null
         ) {
-            $links             = [];
-            $createLinkClosure = $this->createLinkClosure($data->getSize());
-            if (0 < $data->getOffset()) {
-                $prevOffset = max(0, $data->getOffset() - $data->getSize());
-                $links[DocumentInterface::KEYWORD_PREV] = $createLinkClosure($prevOffset);
-            }
+            $links       = [];
+            $linkClosure = $this->createLinkClosure($data->getSize());
 
-            if ($data->hasMoreItems() === true) {
-                $nextOffset = $data->getOffset() + $data->getSize();
-                $links[DocumentInterface::KEYWORD_NEXT] = $createLinkClosure($nextOffset);
-            }
+            $prev = DocumentInterface::KEYWORD_PREV;
+            $next = DocumentInterface::KEYWORD_NEXT;
+            $data->getOffset() <= 0 ?: $links[$prev] = $linkClosure(max(0, $data->getOffset() - $data->getSize()));
+            $data->hasMoreItems() === false ?: $links[$next] = $linkClosure($data->getOffset() + $data->getSize());
 
             $this->withLinks($links);
         }

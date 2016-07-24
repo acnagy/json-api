@@ -21,7 +21,7 @@ use Limoncello\JsonApi\Api\Crud;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Tests\JsonApi\Data\Models\Model;
 
 /**
@@ -38,7 +38,7 @@ abstract class AppCrud extends Crud
     public function __construct(
         FactoryInterface $factory,
         RepositoryInterface $repository,
-        SchemaStorageInterface $modelSchemes,
+        ModelSchemesInterface $modelSchemes,
         PaginationStrategyInterface $paginationStrategy
     ) {
         parent::__construct(

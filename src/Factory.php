@@ -22,14 +22,14 @@ use Limoncello\JsonApi\Api\ModelsData;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Encoder\Encoder;
 use Limoncello\JsonApi\I18n\Translator;
-use Limoncello\JsonApi\Schema\Container;
+use Limoncello\JsonApi\Schema\JsonSchemes;
 use Limoncello\Models\Contracts\FactoryInterface as ModelsFactoryInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Models\Factory as ModelsFactory;
 use Limoncello\Models\ModelStorage;
 use Limoncello\Models\RelationshipStorage;
@@ -121,9 +121,9 @@ class Factory implements FactoryInterface
     /**
      * @inheritdoc
      */
-    public function createModelStorage(SchemaStorageInterface $schemaStorage)
+    public function createModelStorage(ModelSchemesInterface $modelSchemes)
     {
-        return new ModelStorage($schemaStorage);
+        return new ModelStorage($modelSchemes);
     }
 
     /**
@@ -157,25 +157,25 @@ class Factory implements FactoryInterface
      */
     public function createRepository(
         Connection $connection,
-        SchemaStorageInterface $schemaStorage,
+        ModelSchemesInterface $modelSchemes,
         FilterOperationsInterface $filterOperations,
         T $translator
     ) {
-        return new Repository($connection, $schemaStorage, $filterOperations, $translator);
+        return new Repository($connection, $modelSchemes, $filterOperations, $translator);
     }
 
     /**
      * @inheritdoc
      */
-    public function createContainer(array $schemes, SchemaStorageInterface $modelSchemes)
+    public function createJsonSchemes(array $schemes, ModelSchemesInterface $modelSchemes)
     {
-        return new Container($this->getJsonApiFactory(), $schemes, $modelSchemes);
+        return new JsonSchemes($this->getJsonApiFactory(), $schemes, $modelSchemes);
     }
 
     /**
      * @inheritdoc
      */
-    public function createEncoder(ContainerInterface $schemes, EncoderOptions $encoderOptions = null)
+    public function createEncoder(JsonSchemesInterface $schemes, EncoderOptions $encoderOptions = null)
     {
         return new Encoder($this->getJsonApiFactory(), $schemes, $encoderOptions);
     }

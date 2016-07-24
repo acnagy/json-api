@@ -18,11 +18,11 @@
 
 use Generator;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as JsonSchemesContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
 use Limoncello\JsonApi\Contracts\Validation\ValidatorInterface;
 use Limoncello\JsonApi\Http\JsonApiResponse;
-use Limoncello\Models\Contracts\SchemaStorageInterface as ModelSchemesContainerInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Validation\Captures\CaptureAggregator;
 use Limoncello\Validation\Contracts\CaptureAggregatorInterface;
 use Limoncello\Validation\Contracts\RuleInterface;
@@ -42,6 +42,8 @@ use Neomerx\JsonApi\Exceptions\JsonApiException;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Validator implements ValidatorInterface
 {
@@ -58,12 +60,12 @@ class Validator implements ValidatorInterface
     private $validationTranslator;
 
     /**
-     * @var JsonSchemesContainerInterface
+     * @var JsonSchemesInterface
      */
     private $jsonSchemes;
 
     /**
-     * @var ModelSchemesContainerInterface
+     * @var ModelSchemesInterface
      */
     private $modelSchemes;
 
@@ -83,30 +85,30 @@ class Validator implements ValidatorInterface
     private $unlistedRelationshipRule;
 
     /**
-     * @param T                              $jsonApiTranslator
-     * @param ValidationTranslatorInterface  $validationTranslator
-     * @param JsonSchemesContainerInterface  $jsonSchemes
-     * @param ModelSchemesContainerInterface $modelSchemes
-     * @param int                            $errorStatus
-     * @param RuleInterface                  $unlistedAttributeRule
-     * @param RuleInterface                  $unlistedRelationshipRule
+     * @param T                             $jsonApiTranslator
+     * @param ValidationTranslatorInterface $validationTranslator
+     * @param JsonSchemesInterface          $jsonSchemes
+     * @param ModelSchemesInterface         $modelSchemes
+     * @param int                           $errorStatus
+     * @param RuleInterface                 $unlistedAttrRule
+     * @param RuleInterface                 $unlistedRelationRule
      */
     public function __construct(
         T $jsonApiTranslator,
         ValidationTranslatorInterface $validationTranslator,
-        JsonSchemesContainerInterface $jsonSchemes,
-        ModelSchemesContainerInterface $modelSchemes,
+        JsonSchemesInterface $jsonSchemes,
+        ModelSchemesInterface $modelSchemes,
         $errorStatus = JsonApiResponse::HTTP_UNPROCESSABLE_ENTITY,
-        RuleInterface $unlistedAttributeRule = null,
-        RuleInterface $unlistedRelationshipRule = null
+        RuleInterface $unlistedAttrRule = null,
+        RuleInterface $unlistedRelationRule = null
     ) {
         $this->jsonApiTranslator        = $jsonApiTranslator;
         $this->validationTranslator     = $validationTranslator;
         $this->jsonSchemes              = $jsonSchemes;
         $this->modelSchemes             = $modelSchemes;
         $this->errorStatus              = $errorStatus;
-        $this->unlistedAttributeRule    = $unlistedAttributeRule;
-        $this->unlistedRelationshipRule = $unlistedRelationshipRule;
+        $this->unlistedAttributeRule    = $unlistedAttrRule;
+        $this->unlistedRelationshipRule = $unlistedRelationRule;
     }
 
     /**
@@ -177,7 +179,7 @@ class Validator implements ValidatorInterface
     }
 
     /**
-     * @return JsonSchemesContainerInterface
+     * @return JsonSchemesInterface
      */
     protected function getJsonSchemes()
     {
@@ -185,7 +187,7 @@ class Validator implements ValidatorInterface
     }
 
     /**
-     * @return ModelSchemesContainerInterface
+     * @return ModelSchemesInterface
      */
     protected function getModelSchemes()
     {
@@ -341,21 +343,20 @@ class Validator implements ValidatorInterface
         $modelClass           = $schema::MODEL;
         $relationshipCaptures = [];
         foreach ($toOneRules as $name => $rule) {
-            // TODO a) deduplicate getExpectedJsonType here and somewhere in the lib b) move to JsonSchemes
-            $modelRelName                = $schema->getRelationshipMapping($name);
-            $captureName                 = $this->getModelSchemes()->getForeignKey($modelClass, $modelRelName);
-            $expectedType                = $this->getExpectedJsonType($modelClass, $modelRelName);
+            $modelRelName   = $schema->getRelationshipMapping($name);
+            $captureName    = $this->getModelSchemes()->getForeignKey($modelClass, $modelRelName);
+            $expectedSchema = $this->getJsonSchemes()->getModelRelationshipSchema($modelClass, $modelRelName);
             $relationshipCaptures[$name] = $this->createSingleData($name, $this->createOptionalIdentity(
-                static::equals($expectedType),
+                static::equals($expectedSchema::TYPE),
                 static::singleCapture($captureName, $rule, $toOneAggregator)
             ));
         }
         foreach ($toManyRules as $name => $rule) {
-            $modelRelName                = $schema->getRelationshipMapping($name);
-            $captureName                 = $modelRelName;
-            $expectedType                = $this->getExpectedJsonType($modelClass, $modelRelName);
+            $modelRelName   = $schema->getRelationshipMapping($name);
+            $expectedSchema = $this->getJsonSchemes()->getModelRelationshipSchema($modelClass, $modelRelName);
+            $captureName    = $modelRelName;
             $relationshipCaptures[$name] = $this->createMultiData($name, $this->createOptionalIdentity(
-                static::equals($expectedType),
+                static::equals($expectedSchema::TYPE),
                 static::multiCapture($captureName, $rule, $toManyAggregator)
             ));
         }
@@ -385,22 +386,6 @@ class Validator implements ValidatorInterface
             $detail = $this->getValidationTranslator()->translate($error);
             $errors->addRelationshipError($error->getParameterName(), $title, $detail, $this->getErrorStatus());
         }
-    }
-
-    /**
-     * @param string $modelClass
-     * @param string $modelRelationName
-     *
-     * @return string
-     */
-    private function getExpectedJsonType($modelClass, $modelRelationName)
-    {
-        list($reverseClass) = $this->getModelSchemes()->getReverseRelationship($modelClass, $modelRelationName);
-        /** @var SchemaInterface $reverseSchema */
-        $reverseSchema = $this->getJsonSchemes()->getSchemaByType($reverseClass);
-        $type          = $reverseSchema::TYPE;
-
-        return $type;
     }
 
     /**

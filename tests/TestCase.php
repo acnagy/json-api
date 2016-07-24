@@ -18,12 +18,12 @@
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Factory;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
+use Limoncello\Models\ModelSchemes;
 use Limoncello\Models\RelationshipTypes;
-use Limoncello\Models\SchemaStorage;
 use Limoncello\Tests\JsonApi\Data\Migrations\Runner as MigrationRunner;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
@@ -85,15 +85,15 @@ class TestCase extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @return SchemaStorageInterface
+     * @return ModelSchemesInterface
      */
     protected function getModelSchemes()
     {
         $registered    = [];
-        $storage       = new SchemaStorage();
-        $registerModel = function ($modelClass) use ($storage, &$registered) {
+        $modelSchemes  = new ModelSchemes();
+        $registerModel = function ($modelClass) use ($modelSchemes, &$registered) {
             /** @var Model $modelClass */
-            $storage->registerClass(
+            $modelSchemes->registerClass(
                 $modelClass,
                 $modelClass::TABLE_NAME,
                 $modelClass::FIELD_ID,
@@ -108,7 +108,7 @@ class TestCase extends \PHPUnit_Framework_TestCase
                     if (isset($registered[(string)$modelClass][$relName]) === true) {
                         continue;
                     }
-                    $storage->registerBelongsToOneRelationship($modelClass, $relName, $fKey, $rClass, $rRel);
+                    $modelSchemes->registerBelongsToOneRelationship($modelClass, $relName, $fKey, $rClass, $rRel);
                     $registered[(string)$modelClass][$relName] = true;
                     $registered[$rClass][$rRel]                = true;
                 }
@@ -120,7 +120,7 @@ class TestCase extends \PHPUnit_Framework_TestCase
                         continue;
                     }
                     list($rClass, $iTable, $fKeyPrimary, $fKeySecondary, $rRel) = $data;
-                    $storage->registerBelongsToManyRelationship(
+                    $modelSchemes->registerBelongsToManyRelationship(
                         $modelClass,
                         $relName,
                         $iTable,
@@ -144,21 +144,21 @@ class TestCase extends \PHPUnit_Framework_TestCase
             User::class,
         ]);
 
-        return $storage;
+        return $modelSchemes;
     }
 
     /**
-     * @param SchemaStorageInterface            $modelSchemes
+     * @param ModelSchemesInterface             $modelSchemes
      * @param RelationshipStorageInterface|null $storage
      *
-     * @return ContainerInterface
+     * @return JsonSchemesInterface
      */
     protected function getJsonSchemes(
-        SchemaStorageInterface $modelSchemes,
+        ModelSchemesInterface $modelSchemes,
         RelationshipStorageInterface $storage = null
     ) {
         $factory = new Factory();
-        $schemes = $factory->createContainer($this->getSchemeMap(), $modelSchemes);
+        $schemes = $factory->createJsonSchemes($this->getSchemeMap(), $modelSchemes);
 
         $storage === null ?: $schemes->setRelationshipStorage($storage);
 
@@ -173,10 +173,10 @@ class TestCase extends \PHPUnit_Framework_TestCase
         return [
             Board::class   => function (
                 FactoryInterface $factory,
-                ContainerInterface $container,
-                SchemaStorageInterface $schemaStorage
+                JsonSchemesInterface $container,
+                ModelSchemesInterface $modelSchemes
             ) {
-                return new BoardSchema($factory, $container, $schemaStorage);
+                return new BoardSchema($factory, $container, $modelSchemes);
             },
             Comment::class => CommentSchema::class,
             Emotion::class => EmotionSchema::class,

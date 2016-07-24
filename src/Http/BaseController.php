@@ -25,9 +25,10 @@ use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\Http\ControllerInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface as JsonSchemesContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
+use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
 use Neomerx\JsonApi\Contracts\Http\Headers\MediaTypeInterface;
 use Neomerx\JsonApi\Contracts\Http\Query\QueryParametersParserInterface;
@@ -40,6 +41,8 @@ use Psr\Http\Message\ServerRequestInterface;
 
 /**
  * @package Limoncello\JsonApi
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 abstract class BaseController implements ControllerInterface
 {
@@ -146,29 +149,38 @@ abstract class BaseController implements ControllerInterface
         ContainerInterface $container,
         ServerRequestInterface $request
     ) {
-        /** @var QueryParametersParserInterface $queryParser */
-        $queryParser    = $container->get(QueryParametersParserInterface::class);
-        $encodingParams = $queryParser->parse($request);
-
-        /** @var SchemaStorageInterface $modelSchemaStorage */
-        $modelSchemaStorage = $container->get(SchemaStorageInterface::class);
-        /** @var JsonSchemesContainerInterface $jsonSchemaStorage */
-        $jsonSchemaStorage  = $container->get(JsonSchemesContainerInterface::class);
-        /** @var SchemaInterface $schemaClass */
-        $schemaClass  = static::SCHEMA_CLASS;
-        $modelRelName = $schemaClass::getMappings()[$schemaClass::SCHEMA_RELATIONSHIPS][$relationshipName];
-        list ($reverseModelClass) = $modelSchemaStorage->getReverseRelationship($schemaClass::MODEL, $modelRelName);
-
-        $targetSchema      = $jsonSchemaStorage->getSchemaByType($reverseModelClass);
-        $targetSchemaClass = get_class($targetSchema);
-        list ($filters, $sorts, , $paging) =
-            static::mapQueryParameters($container, $encodingParams, $targetSchemaClass);
-
-        $relData = self::createApi($container)->readRelationship($index, $modelRelName, $filters, $sorts, $paging);
+        /** @var PaginatedDataInterface $relData */
+        /** @var EncodingParametersInterface $encodingParams */
+        list ($relData, $encodingParams) = self::readRelationshipData($index, $relationshipName, $container, $request);
 
         $responses = static::createResponses($container, $request, $encodingParams);
         $response  = $relData->getData() === null ?
             $responses->getCodeResponse(404) : $responses->getContentResponse($relData);
+
+        return $response;
+    }
+
+    /**
+     * @param string                 $index
+     * @param string                 $relationshipName
+     * @param ContainerInterface     $container
+     * @param ServerRequestInterface $request
+     *
+     * @return ResponseInterface
+     */
+    protected static function readRelationshipIdentifiers(
+        $index,
+        $relationshipName,
+        ContainerInterface $container,
+        ServerRequestInterface $request
+    ) {
+        /** @var PaginatedDataInterface $relData */
+        /** @var EncodingParametersInterface $encodingParams */
+        list ($relData, $encodingParams) = self::readRelationshipData($index, $relationshipName, $container, $request);
+
+        $responses = static::createResponses($container, $request, $encodingParams);
+        $response  = $relData->getData() === null ?
+            $responses->getCodeResponse(404) : $responses->getIdentifiersResponse($relData);
 
         return $response;
     }
@@ -182,7 +194,7 @@ abstract class BaseController implements ControllerInterface
     {
         $factory            = $container->get(FactoryInterface::class);
         $repository         = $container->get(RepositoryInterface::class);
-        $modelSchemes       = $container->get(SchemaStorageInterface::class);
+        $modelSchemes       = $container->get(ModelSchemesInterface::class);
         $paginationStrategy = $container->get(PaginationStrategyInterface::class);
 
         $apiClass = static::API_CLASS;
@@ -207,8 +219,8 @@ abstract class BaseController implements ControllerInterface
         $factory = $container->get(FactoryInterface::class);
         $errors  = $factory->createErrorCollection();
         $queryTransformer = new QueryTransformer(
-            $container->get(SchemaStorageInterface::class),
-            $container->get(JsonSchemesContainerInterface::class),
+            $container->get(ModelSchemesInterface::class),
+            $container->get(JsonSchemesInterface::class),
             $container->get(TranslatorInterface::class),
             $schemaClass
         );
@@ -242,8 +254,8 @@ abstract class BaseController implements ControllerInterface
         $urlPrefix = $config
             ->getConfig()[JsonApiConfigInterface::KEY_JSON][JsonApiConfigInterface::KEY_JSON_URL_PREFIX];
 
-        /** @var JsonSchemesContainerInterface $jsonSchemes */
-        $jsonSchemes = $container->get(JsonSchemesContainerInterface::class);
+        /** @var JsonSchemesInterface $jsonSchemes */
+        $jsonSchemes = $container->get(JsonSchemesInterface::class);
         $responses   = new Responses(
             new MediaType(MediaTypeInterface::JSON_API_TYPE, MediaTypeInterface::JSON_API_SUB_TYPE),
             new SupportedExtensions(),
@@ -288,10 +300,42 @@ abstract class BaseController implements ControllerInterface
         /** @var SchemaInterface $schemaClass */
         $schemaClass = static::SCHEMA_CLASS;
         $modelClass  = $schemaClass::MODEL;
-        /** @var JsonSchemesContainerInterface $jsonSchemes */
-        $jsonSchemes = $container->get(JsonSchemesContainerInterface::class);
+        /** @var JsonSchemesInterface $jsonSchemes */
+        $jsonSchemes = $container->get(JsonSchemesInterface::class);
         $schema      = $jsonSchemes->getSchemaByType($modelClass);
 
         return $schema;
+    }
+
+    /**
+     * @param string                 $index
+     * @param string                 $relationshipName
+     * @param ContainerInterface     $container
+     * @param ServerRequestInterface $request
+     *
+     * @return array [PaginatedDataInterface, EncodingParametersInterface]
+     */
+    private static function readRelationshipData(
+        $index,
+        $relationshipName,
+        ContainerInterface $container,
+        ServerRequestInterface $request
+    ) {
+        /** @var QueryParametersParserInterface $queryParser */
+        $queryParser    = $container->get(QueryParametersParserInterface::class);
+        $encodingParams = $queryParser->parse($request);
+
+        /** @var JsonSchemesInterface $jsonSchemes */
+        $jsonSchemes  = $container->get(JsonSchemesInterface::class);
+        $targetSchema = $jsonSchemes->getRelationshipSchema(static::SCHEMA_CLASS, $relationshipName);
+        list ($filters, $sorts, , $paging) =
+            static::mapQueryParameters($container, $encodingParams, get_class($targetSchema));
+
+        /** @var SchemaInterface $schemaClass */
+        $schemaClass  = static::SCHEMA_CLASS;
+        $modelRelName = $schemaClass::getMappings()[SchemaInterface::SCHEMA_RELATIONSHIPS][$relationshipName];
+        $relData = self::createApi($container)->readRelationship($index, $modelRelName, $filters, $sorts, $paging);
+
+        return [$relData, $encodingParams];
     }
 }

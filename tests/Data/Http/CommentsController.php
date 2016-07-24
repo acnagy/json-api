@@ -106,4 +106,55 @@ class CommentsController extends BaseController
 
         return static::readRelationship($index, Schema::REL_EMOTIONS, $container, $request);
     }
+
+    /**
+     * @param array                  $routeParams
+     * @param ContainerInterface     $container
+     * @param ServerRequestInterface $request
+     *
+     * @return ResponseInterface
+     */
+    public static function readEmotionsIdentifiers(
+        array $routeParams,
+        ContainerInterface $container,
+        ServerRequestInterface $request
+    ) {
+        $index = $routeParams[static::ROUTE_KEY_INDEX];
+
+        return static::readRelationshipIdentifiers($index, Schema::REL_EMOTIONS, $container, $request);
+    }
+
+    /**
+     * @param array                  $routeParams
+     * @param ContainerInterface     $container
+     * @param ServerRequestInterface $request
+     *
+     * @return ResponseInterface
+     */
+    public static function readUser(
+        array $routeParams,
+        ContainerInterface $container,
+        ServerRequestInterface $request
+    ) {
+        $index = $routeParams[static::ROUTE_KEY_INDEX];
+
+        return static::readRelationship($index, Schema::REL_USER, $container, $request);
+    }
+
+    /**
+     * @param array                  $routeParams
+     * @param ContainerInterface     $container
+     * @param ServerRequestInterface $request
+     *
+     * @return ResponseInterface
+     */
+    public static function readPost(
+        array $routeParams,
+        ContainerInterface $container,
+        ServerRequestInterface $request
+    ) {
+        $index = $routeParams[static::ROUTE_KEY_INDEX];
+
+        return static::readRelationship($index, Schema::REL_POST, $container, $request);
+    }
 }

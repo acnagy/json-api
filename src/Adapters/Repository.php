@@ -25,7 +25,7 @@ use Limoncello\JsonApi\Contracts\Http\Query\FilterParameterInterface;
 use Limoncello\JsonApi\Contracts\Http\Query\SortParameterInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\RelationshipTypes;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
@@ -33,6 +33,7 @@ use Neomerx\JsonApi\Exceptions\ErrorCollection;
  * @package Limoncello\JsonApi
  *
  * @SuppressWarnings(PHPMD.TooManyPublicMethods)
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  */
 class Repository implements RepositoryInterface
@@ -49,7 +50,7 @@ class Repository implements RepositoryInterface
     private $connection;
 
     /**
-     * @var SchemaStorageInterface
+     * @var ModelSchemesInterface
      */
     private $modelSchemes;
 
@@ -65,13 +66,13 @@ class Repository implements RepositoryInterface
 
     /**
      * @param Connection                $connection
-     * @param SchemaStorageInterface    $modelSchemes
+     * @param ModelSchemesInterface     $modelSchemes
      * @param FilterOperationsInterface $filterOperations
      * @param T                         $translator
      */
     public function __construct(
         Connection $connection,
-        SchemaStorageInterface $modelSchemes,
+        ModelSchemesInterface $modelSchemes,
         FilterOperationsInterface $filterOperations,
         T $translator
     ) {
@@ -232,6 +233,9 @@ class Repository implements RepositoryInterface
 
     /**
      * @inheritdoc
+     *
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @SuppressWarnings(PHPMD.ElseExpression)
      */
     public function applyFilters(
         ErrorCollection $errors,
@@ -276,12 +280,12 @@ class Repository implements RepositoryInterface
                             break;
                         case RelationshipTypes::HAS_MANY:
                             // here we join hasMany table and apply filter on its primary key
+                            $primaryKey    = $modelSchemes->getPrimaryKey($modelClass);
                             list ($reverseClass, $reverseName) = $modelSchemes
                                 ->getReverseRelationship($modelClass, $filterParam->getName());
-                            $primaryKey    = $modelSchemes->getPrimaryKey($modelClass);
                             $filterTable   = $modelSchemes->getTable($reverseClass);
-                            $filterColumn  = $modelSchemes->getPrimaryKey($reverseClass);
                             $reverseFk     = $modelSchemes->getForeignKey($reverseClass, $reverseName);
+                            $filterColumn  = $modelSchemes->getPrimaryKey($reverseClass);
                             $aliased       = $filterTable . $aliasId;
                             $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
                                 $this->buildTableColumn($aliased, $reverseFk);
@@ -371,7 +375,7 @@ class Repository implements RepositoryInterface
     }
 
     /**
-     * @return SchemaStorageInterface
+     * @return ModelSchemesInterface
      */
     protected function getModelSchemes()
     {
@@ -587,11 +591,11 @@ class Repository implements RepositoryInterface
      */
     private function createBelongsToBuilder($modelClass, $relationshipName)
     {
-        list($oneClass) = $this->getModelSchemes()->getReverseRelationship($modelClass, $relationshipName);
-        $table         = $this->getTableName($modelClass);
-        $foreignKey    = $this->getModelSchemes()->getForeignKey($modelClass, $relationshipName);
+        $oneClass      = $this->getModelSchemes()->getReverseModelClass($modelClass, $relationshipName);
         $oneTable      = $this->getTableName($oneClass);
         $onePrimaryKey = $this->getPrimaryKeyName($oneClass);
+        $table         = $this->getTableName($modelClass);
+        $foreignKey    = $this->getModelSchemes()->getForeignKey($modelClass, $relationshipName);
 
         $builder = $this->getConnection()->createQueryBuilder();
 
@@ -635,8 +639,7 @@ class Repository implements RepositoryInterface
     {
         list ($intermediateTable, $foreignKey, $reverseForeignKey) =
             $this->getModelSchemes()->getBelongsToManyRelationship($modelClass, $relationshipName);
-        list ($reverseClass) =
-            $this->getModelSchemes()->getReverseRelationship($modelClass, $relationshipName);
+        $reverseClass = $this->getModelSchemes()->getReverseModelClass($modelClass, $relationshipName);
         $reverseTable = $this->getModelSchemes()->getTable($reverseClass);
         $reversePk    = $this->getModelSchemes()->getPrimaryKey($reverseClass);
 

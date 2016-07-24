@@ -22,12 +22,12 @@ use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\Models\Contracts\FactoryInterface as ModelsFactoryInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\Contracts\ModelStorageInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Models\Contracts\TagStorageInterface;
 use Neomerx\JsonApi\Encoder\EncoderOptions;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
@@ -48,11 +48,11 @@ interface FactoryInterface extends ModelsFactoryInterface
     public function createRelationshipStorage();
 
     /**
-     * @param SchemaStorageInterface $schemaStorage
+     * @param ModelSchemesInterface $modelSchemes
      *
      * @return ModelStorageInterface
      */
-    public function createModelStorage(SchemaStorageInterface $schemaStorage);
+    public function createModelStorage(ModelSchemesInterface $modelSchemes);
 
     /**
      * @return TagStorageInterface
@@ -77,7 +77,7 @@ interface FactoryInterface extends ModelsFactoryInterface
 
     /**
      * @param Connection                $connection
-     * @param SchemaStorageInterface    $schemaStorage
+     * @param ModelSchemesInterface     $modelSchemes
      * @param FilterOperationsInterface $filterOperations
      * @param TranslatorInterface       $translator
      *
@@ -85,24 +85,24 @@ interface FactoryInterface extends ModelsFactoryInterface
      */
     public function createRepository(
         Connection $connection,
-        SchemaStorageInterface $schemaStorage,
+        ModelSchemesInterface $modelSchemes,
         FilterOperationsInterface $filterOperations,
         TranslatorInterface $translator
     );
 
     /**
-     * @param array                  $schemes
-     * @param SchemaStorageInterface $modelSchemes
+     * @param array                 $schemes
+     * @param ModelSchemesInterface $modelSchemes
      *
-     * @return ContainerInterface
+     * @return JsonSchemesInterface
      */
-    public function createContainer(array $schemes, SchemaStorageInterface $modelSchemes);
+    public function createJsonSchemes(array $schemes, ModelSchemesInterface $modelSchemes);
 
     /**
-     * @param ContainerInterface $schemes
-     * @param EncoderOptions     $encoderOptions
+     * @param JsonSchemesInterface $schemes
+     * @param EncoderOptions       $encoderOptions
      *
      * @return EncoderInterface
      */
-    public function createEncoder(ContainerInterface $schemes, EncoderOptions $encoderOptions = null);
+    public function createEncoder(JsonSchemesInterface $schemes, EncoderOptions $encoderOptions = null);
 }

@@ -17,10 +17,10 @@
  */
 
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Limoncello\Models\RelationshipTypes;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Document\LinkInterface;
@@ -32,30 +32,30 @@ use Neomerx\JsonApi\Schema\SchemaProvider;
  */
 abstract class Schema extends SchemaProvider implements SchemaInterface
 {
-    /** @var ContainerInterface  */
+    /** @var JsonSchemesInterface  */
     private $container;
 
     /**
-     * @var SchemaStorageInterface
+     * @var ModelSchemesInterface
      */
-    private $schemaStorage;
+    private $modelSchemes;
 
     /**
-     * @param FactoryInterface       $factory
-     * @param ContainerInterface     $container
-     * @param SchemaStorageInterface $schemaStorage
+     * @param FactoryInterface      $factory
+     * @param JsonSchemesInterface  $container
+     * @param ModelSchemesInterface $modelSchemes
      */
     public function __construct(
         FactoryInterface $factory,
-        ContainerInterface $container,
-        SchemaStorageInterface $schemaStorage
+        JsonSchemesInterface $container,
+        ModelSchemesInterface $modelSchemes
     ) {
         $this->resourceType = static::TYPE;
 
         parent::__construct($factory);
 
-        $this->container     = $container;
-        $this->schemaStorage = $schemaStorage;
+        $this->container    = $container;
+        $this->modelSchemes = $modelSchemes;
     }
 
     /**
@@ -107,7 +107,7 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
                 $isRelToBeIncluded = array_key_exists($jsonRelName, $includeRelationships) === true;
 
                 $hasRelData = $this->hasRelationship($model, $modelRelName);
-                $relType    = $this->getSchemaStorage()->getRelationshipType($modelClass, $modelRelName);
+                $relType    = $this->getModelSchemes()->getRelationshipType($modelClass, $modelRelName);
 
                 // there is a case for `to-1` relationship when we can return identity resource (type + id)
                 if ($relType === RelationshipTypes::BELONGS_TO &&
@@ -143,7 +143,7 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
     }
 
     /**
-     * @return ContainerInterface
+     * @return JsonSchemesInterface
      */
     protected function getContainer()
     {
@@ -151,11 +151,11 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
     }
 
     /**
-     * @return SchemaStorageInterface
+     * @return ModelSchemesInterface
      */
-    protected function getSchemaStorage()
+    protected function getModelSchemes()
     {
-        return $this->schemaStorage;
+        return $this->modelSchemes;
     }
 
     /**
@@ -218,13 +218,13 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
      */
     protected function getIdentity($model, $modelRelName)
     {
-        $schema = $this->getSchemaStorage();
+        $schema = $this->getModelSchemes();
 
-        $class              = get_class($model);
-        $fkName             = $schema->getForeignKey($class, $modelRelName);
-        list($reverseClass) = $schema->getReverseRelationship($class, $modelRelName);
-        $reversePkName      = $schema->getPrimaryKey($reverseClass);
-        $reversePkValue     = $model->{$fkName};
+        $class          = get_class($model);
+        $fkName         = $schema->getForeignKey($class, $modelRelName);
+        $reverseClass   = $schema->getReverseModelClass($class, $modelRelName);
+        $reversePkName  = $schema->getPrimaryKey($reverseClass);
+        $reversePkValue = $model->{$fkName};
 
         $model = new $reverseClass;
         $model->{$reversePkName} = $reversePkValue;

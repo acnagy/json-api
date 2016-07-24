@@ -17,16 +17,17 @@
  */
 
 use Closure;
-use Limoncello\JsonApi\Contracts\Schema\ContainerInterface;
+use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
+use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\SchemaStorageInterface;
 use Neomerx\JsonApi\Contracts\Schema\SchemaFactoryInterface;
+use Neomerx\JsonApi\Schema\Container;
 
 /**
  * @package Limoncello\JsonApi
  */
-class Container extends \Neomerx\JsonApi\Schema\Container implements ContainerInterface
+class JsonSchemes extends Container implements JsonSchemesInterface
 {
     /**
      * @var RelationshipStorageInterface
@@ -34,16 +35,16 @@ class Container extends \Neomerx\JsonApi\Schema\Container implements ContainerIn
     private $relationshipStorage;
 
     /**
-     * @var SchemaStorageInterface
+     * @var ModelSchemesInterface
      */
     private $modelSchemes;
 
     /**
      * @param SchemaFactoryInterface $factory
      * @param array                  $schemas
-     * @param SchemaStorageInterface $modelSchemes
+     * @param ModelSchemesInterface  $modelSchemes
      */
-    public function __construct(SchemaFactoryInterface $factory, array $schemas, SchemaStorageInterface $modelSchemes)
+    public function __construct(SchemaFactoryInterface $factory, array $schemas, ModelSchemesInterface $modelSchemes)
     {
         parent::__construct($factory, $schemas);
         $this->modelSchemes = $modelSchemes;
@@ -66,7 +67,31 @@ class Container extends \Neomerx\JsonApi\Schema\Container implements ContainerIn
     }
 
     /**
-     * @return SchemaStorageInterface
+     * @inheritdoc
+     */
+    public function getRelationshipSchema($schemaClass, $relationshipName)
+    {
+        /** @var SchemaInterface $schemaClass */
+
+        $modelRelName = $schemaClass::getMappings()[SchemaInterface::SCHEMA_RELATIONSHIPS][$relationshipName];
+        $targetSchema = $this->getModelRelationshipSchema($schemaClass::MODEL, $modelRelName);
+
+        return $targetSchema;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getModelRelationshipSchema($modelClass, $relationshipName)
+    {
+        $reverseModelClass = $this->getModelSchemes()->getReverseModelClass($modelClass, $relationshipName);
+        $targetSchema      = $this->getSchemaByType($reverseModelClass);
+
+        return $targetSchema;
+    }
+
+    /**
+     * @return ModelSchemesInterface
      */
     protected function getModelSchemes()
     {
