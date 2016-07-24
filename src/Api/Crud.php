@@ -479,11 +479,10 @@ class Crud implements CrudInterface
      *
      * @return QueryBuilder
      */
-    protected function builderSaveRelationshipOnCreate($relationshipName, QueryBuilder $builder)
-    {
-        // suppress unused warning
-        $relationshipName ?: null;
-
+    protected function builderSaveRelationshipOnCreate(/** @noinspection PhpUnusedParameterInspection */
+        $relationshipName,
+        QueryBuilder $builder
+    ) {
         return $builder;
     }
 
@@ -493,11 +492,10 @@ class Crud implements CrudInterface
      *
      * @return QueryBuilder
      */
-    protected function builderSaveRelationshipOnUpdate($relationshipName, QueryBuilder $builder)
-    {
-        // suppress unused warning
-        $relationshipName ?: null;
-
+    protected function builderSaveRelationshipOnUpdate(/** @noinspection PhpUnusedParameterInspection */
+        $relationshipName,
+        QueryBuilder $builder
+    ) {
         return $builder;
     }
 
@@ -507,11 +505,10 @@ class Crud implements CrudInterface
      *
      * @return QueryBuilder
      */
-    protected function builderCleanRelationshipOnUpdate($relationshipName, QueryBuilder $builder)
-    {
-        // suppress unused warning
-        $relationshipName ?: null;
-
+    protected function builderCleanRelationshipOnUpdate(/** @noinspection PhpUnusedParameterInspection */
+        $relationshipName,
+        QueryBuilder $builder
+    ) {
         return $builder;
     }
 
