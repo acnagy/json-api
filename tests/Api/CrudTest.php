@@ -131,6 +131,7 @@ class CrudTest extends TestCase
         $this->assertNotEmpty($index = $model->{Comment::FIELD_ID});
 
         // check resources is saved
+        /** @noinspection SqlDialectInspection */
         $res = $this->connection
             ->query('SELECT * FROM ' . Comment::TABLE_NAME . ' WHERE ' . Comment::FIELD_ID . " = $index")
             ->fetch(PDO::FETCH_ASSOC);
@@ -138,6 +139,7 @@ class CrudTest extends TestCase
         $this->assertEquals($userId, $res[Comment::FIELD_ID_USER]);
         $this->assertEquals($postId, $res[Comment::FIELD_ID_POST]);
         // check resource to-many relationship are saved
+        /** @noinspection SqlDialectInspection */
         $res = $this->connection->query(
             'SELECT * FROM ' . CommentEmotion::TABLE_NAME . ' WHERE ' . CommentEmotion::FIELD_ID_COMMENT . " = $index"
         )->fetchAll(PDO::FETCH_ASSOC);
@@ -431,6 +433,7 @@ class CrudTest extends TestCase
         $users = $data->getPaginatedData()->getData();
         $this->assertNotEmpty($users);
 
+        /** @noinspection SqlDialectInspection */
         $query   = 'SELECT COUNT(*) FROM ' . User::TABLE_NAME . ' WHERE ' . User::FIELD_IS_ACTIVE . ' = 1';
         $actives = $this->connection->query($query)->fetch(PDO::FETCH_NUM)[0];
 

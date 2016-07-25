@@ -198,7 +198,7 @@ abstract class BaseController implements ControllerInterface
         $paginationStrategy = $container->get(PaginationStrategyInterface::class);
 
         $apiClass = static::API_CLASS;
-        $api      = new $apiClass($factory, $repository, $modelSchemes, $paginationStrategy);
+        $api      = new $apiClass($factory, $repository, $modelSchemes, $paginationStrategy, $container);
 
         return $api;
     }

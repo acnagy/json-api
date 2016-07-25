@@ -17,6 +17,7 @@
  */
 
 use Doctrine\DBAL\Query\QueryBuilder;
+use Interop\Container\ContainerInterface;
 use Limoncello\JsonApi\Api\Crud;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
@@ -33,13 +34,19 @@ abstract class AppCrud extends Crud
     const MODEL_CLASS = null;
 
     /**
+     * @var ContainerInterface|null
+     */
+    private $container;
+
+    /**
      * @inheritdoc
      */
     public function __construct(
         FactoryInterface $factory,
         RepositoryInterface $repository,
         ModelSchemesInterface $modelSchemes,
-        PaginationStrategyInterface $paginationStrategy
+        PaginationStrategyInterface $paginationStrategy,
+        ContainerInterface $container = null
     ) {
         parent::__construct(
             $factory,
@@ -48,6 +55,17 @@ abstract class AppCrud extends Crud
             $modelSchemes,
             $paginationStrategy
         );
+        $this->container = $container;
+        // we do not use container in test (invoke for test coverage)
+        $this->getContainer();
+    }
+
+    /**
+     * @return ContainerInterface|null
+     */
+    protected function getContainer()
+    {
+        return $this->container;
     }
 
     /**
