@@ -611,6 +611,39 @@ EOT;
     /**
      * Controller test.
      */
+    public function testUpdateNonExistingItem()
+    {
+        $text      = 'Some comment text';
+        $index     = '-1';
+        $jsonInput = <<<EOT
+        {
+            "data" : {
+                "type"  : "comments",
+                "id"    : "$index",
+                "attributes" : {
+                    "text-attribute" : "$text"
+                }
+            }
+        }
+EOT;
+
+        $routeParams = [CommentsController::ROUTE_KEY_INDEX => $index];
+        /** @var Mock $request */
+        $request = Mockery::mock(ServerRequestInterface::class);
+        $request->shouldReceive('getBody')->once()->withNoArgs()->andReturn($jsonInput);
+        $request->shouldReceive('getUri')->once()->withNoArgs()->andReturn(new Uri('http://localhost.local/comments'));
+
+        /** @var ServerRequestInterface $request */
+
+        $container = $this->createContainer();
+        $response  = CommentsController::update($routeParams, $container, $request);
+        $this->assertNotNull($response);
+        $this->assertEquals(404, $response->getStatusCode());
+    }
+
+    /**
+     * Controller test.
+     */
     public function testSendInvalidInput()
     {
         $index     = '1';

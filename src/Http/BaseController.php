@@ -118,8 +118,10 @@ abstract class BaseController implements ControllerInterface
         $index    = $routeParams[static::ROUTE_KEY_INDEX];
         list ($attributes, $toMany) = static::parseInputOnUpdate($index, $container, $request);
         self::createApi($container)->update($index, $attributes, $toMany);
-        $data     = self::createApi($container)->read($index);
-        $response = static::createResponses($container, $request)->getContentResponse($data);
+        $modelData = self::createApi($container)->read($index);
+        $responses = static::createResponses($container, $request);
+        $response  = $modelData->getPaginatedData()->getData() === null ?
+            $responses->getCodeResponse(404) : $responses->getContentResponse($modelData);
 
         return $response;
     }

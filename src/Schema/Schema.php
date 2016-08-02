@@ -33,7 +33,7 @@ use Neomerx\JsonApi\Schema\SchemaProvider;
 abstract class Schema extends SchemaProvider implements SchemaInterface
 {
     /** @var JsonSchemesInterface  */
-    private $container;
+    private $jsonSchemes;
 
     /**
      * @var ModelSchemesInterface
@@ -42,19 +42,19 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
 
     /**
      * @param FactoryInterface      $factory
-     * @param JsonSchemesInterface  $container
+     * @param JsonSchemesInterface  $jsonSchemes
      * @param ModelSchemesInterface $modelSchemes
      */
     public function __construct(
         FactoryInterface $factory,
-        JsonSchemesInterface $container,
+        JsonSchemesInterface $jsonSchemes,
         ModelSchemesInterface $modelSchemes
     ) {
         $this->resourceType = static::TYPE;
 
         parent::__construct($factory);
 
-        $this->container    = $container;
+        $this->jsonSchemes  = $jsonSchemes;
         $this->modelSchemes = $modelSchemes;
     }
 
@@ -133,7 +133,7 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
                     continue;
                 }
 
-                $relData = $this->getContainer()->getRelationshipStorage()->getRelationship($model, $modelRelName);
+                $relData = $this->getJsonSchemes()->getRelationshipStorage()->getRelationship($model, $modelRelName);
                 $relUri  = $this->getRelationshipSelfUrl($model, $jsonRelName);
                 $relationships[$jsonRelName] = $this->getRelationshipDescription($relData, $relUri);
             }
@@ -145,9 +145,9 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
     /**
      * @return JsonSchemesInterface
      */
-    protected function getContainer()
+    protected function getJsonSchemes()
     {
-        return $this->container;
+        return $this->jsonSchemes;
     }
 
     /**
@@ -240,7 +240,7 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
      */
     private function hasRelationship($model, $name)
     {
-        $relationships   = $this->getContainer()->getRelationshipStorage();
+        $relationships   = $this->getJsonSchemes()->getRelationshipStorage();
         $hasRelationship = ($relationships !== null && $relationships->hasRelationship($model, $name) === true);
 
         return $hasRelationship;
