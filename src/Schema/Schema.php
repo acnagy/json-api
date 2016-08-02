@@ -222,9 +222,13 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
 
         $class          = get_class($model);
         $fkName         = $schema->getForeignKey($class, $modelRelName);
-        $reverseClass   = $schema->getReverseModelClass($class, $modelRelName);
-        $reversePkName  = $schema->getPrimaryKey($reverseClass);
         $reversePkValue = $model->{$fkName};
+        if ($reversePkValue === null) {
+            return null;
+        }
+
+        $reverseClass  = $schema->getReverseModelClass($class, $modelRelName);
+        $reversePkName = $schema->getPrimaryKey($reverseClass);
 
         $model = new $reverseClass;
         $model->{$reversePkName} = $reversePkValue;
