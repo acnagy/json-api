@@ -358,6 +358,31 @@ class CrudTest extends TestCase
     /**
      * Test index.
      */
+    public function testIndexDefaultFilteringOperationOnRelationship()
+    {
+        $crud = $this->createCrud(PostsApi::class);
+
+        $pagingOffset        = 0;
+        $pagingSize          = 20;
+        $pagingParameters    = [
+            PaginationStrategyInterface::PARAM_PAGING_SKIP => $pagingOffset,
+            PaginationStrategyInterface::PARAM_PAGING_SIZE => $pagingSize,
+        ];
+
+        $filteringParameters = new FilterParameterCollection();
+        $value               = '2,4';
+        $filteringParameters->add(
+            new FilterParameter(PostSchema::REL_USER, Post::REL_USER, $value, true, RelationshipTypes::BELONGS_TO)
+        );
+
+        $data = $crud->index($filteringParameters, null, null, $pagingParameters);
+
+        $this->assertCount(6, $data->getPaginatedData()->getData());
+    }
+
+    /**
+     * Test index.
+     */
     public function testCommentsIndex()
     {
         // check that API returns comments from only specific user (as configured in Comments API)

@@ -44,6 +44,15 @@ class Repository implements RepositoryInterface
     /** Filer constant */
     const FILTER_OP_IS_NOT_NULL = 'not-null';
 
+    /** Default filtering operation */
+    const DEFAULT_FILTER_OPERATION = 'in';
+
+    /** Default filtering operation */
+    const DEFAULT_FILTER_OPERATION_SINGLE = 'eq';
+
+    /** Default filtering operation */
+    const DEFAULT_FILTER_OPERATION_EMPTY = self::FILTER_OP_IS_NULL;
+
     /**
      * @var Connection
      */
@@ -257,14 +266,25 @@ class Repository implements RepositoryInterface
         $modelSchemes       = $this->getModelSchemes();
         foreach ($filterParams as $filterParam) {
             /** @var FilterParameterInterface $filterParam */
-            // it should be array of 'operation' => parameters (string/array)
-            if (is_array($filterParam->getValue()) === false) {
-                $errMsg = $this->getTranslator()->get(T::MSG_ERR_INVALID_PARAMETER);
-                $errors->addQueryParameterError($filterParam->getOriginalName(), $errMsg);
-                continue;
+            $filterValue = $filterParam->getValue();
+
+            // if filter value is not array of 'operation' => parameters (string/array) but
+            // just parameters we will apply default operation
+            // for example instead of `filter[id][in]=1,2,3,8,9,10` we got `filter[id]=1,2,3,8,9,10`
+            if (is_array($filterValue) === false) {
+                if (empty($filterValue) === true) {
+                    $operation     = static::DEFAULT_FILTER_OPERATION_EMPTY;
+                    $filterIndexes = null;
+                } else {
+                    $filterIndexes = explode(',', $filterValue);
+                    $numIndexes    = count($filterIndexes);
+                    $operation     = $numIndexes === 1 ?
+                        static::DEFAULT_FILTER_OPERATION_SINGLE : static::DEFAULT_FILTER_OPERATION;
+                }
+                $filterValue = [$operation => $filterIndexes];
             }
 
-            foreach ($filterParam->getValue() as $operation => $params) {
+            foreach ($filterValue as $operation => $params) {
                 $filterTable  = null;
                 $filterColumn = null;
                 $lcOp = strtolower((string)$operation);

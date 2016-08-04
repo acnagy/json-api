@@ -223,6 +223,125 @@ class RepositoryTest extends TestCase
     /**
      * Test builder.
      */
+    public function testIndexFilterWithDefaultOperationOnAttributeMultiValue()
+    {
+        $value        = '1,3,2';
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, $value, false, null)
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Board::class));
+        $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
+            '`boards`.`updated_at`, `boards`.`deleted_at` ' .
+            'FROM boards ' .
+            'WHERE ' .
+            '`boards`.`title` IN (:dcValue1, :dcValue2, :dcValue3)';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEquals([
+            'dcValue1'  => '1',
+            'dcValue2'  => '3',
+            'dcValue3'  => '2',
+        ], $builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testIndexFilterWithDefaultOperationOnAttributeSingleValue()
+    {
+        $value        = '1';
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, $value, false, null)
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Board::class));
+        $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
+            '`boards`.`updated_at`, `boards`.`deleted_at` ' .
+            'FROM boards ' .
+            'WHERE ' .
+            '`boards`.`title` = :dcValue1';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEquals([
+            'dcValue1'  => '1',
+        ], $builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testIndexFilterWithDefaultOperationOnAttributeEmptyValue()
+    {
+        $value        = '';
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, $value, false, null)
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Board::class));
+        $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
+            '`boards`.`updated_at`, `boards`.`deleted_at` ' .
+            'FROM boards ' .
+            'WHERE ' .
+            '`boards`.`title` IS NULL';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEmpty($builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testIndexFilterWithDefaultOperationOnRelationshipMultiValue()
+    {
+        $value        = '1,3,2';
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::REL_POSTS, Board::REL_POSTS, $value, true, RelationshipTypes::HAS_MANY)
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Board::class));
+        $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
+            '`boards`.`updated_at`, `boards`.`deleted_at` ' .
+            'FROM boards ' .
+            'INNER JOIN posts posts1 ON `boards`.`id_board`=`posts1`.`id_board_fk` ' .
+            'WHERE `posts1`.`id_post` IN (:dcValue1, :dcValue2, :dcValue3) ' .
+            'GROUP BY `boards`.`id_board`';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEquals([
+            'dcValue1'  => '1',
+            'dcValue2'  => '3',
+            'dcValue3'  => '2',
+        ], $builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
     public function testIndexWithSorting()
     {
         $sortingParams = [
@@ -311,16 +430,19 @@ class RepositoryTest extends TestCase
     public function testIndexWithVariousInvalidParams()
     {
         $filterParams = new FilterParameterCollection();
-        $filterParams->add(
-            new FilterParameter(BoardSchema::RESOURCE_ID, Board::FIELD_ID, '', false, null)
-        )->add(
-            new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, ['unknown-op' => 'aaa'], false, null)
-        );
+        $filterParams
+            // empty is valid
+            ->add(new FilterParameter(BoardSchema::RESOURCE_ID, Board::FIELD_ID, '', false, null))
+
+            // unknown operation is invalid
+            ->add(
+                new FilterParameter(BoardSchema::ATTR_TITLE, Board::FIELD_TITLE, ['unknown-op' => 'aaa'], false, null)
+            );
 
         $errors = new ErrorCollection();
         $this->assertNotNull($builder = $this->repository->index(Board::class));
         $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
-        $this->assertCount(2, $errors);
+        $this->assertCount(1, $errors);
     }
 
     /**
@@ -335,6 +457,7 @@ class RepositoryTest extends TestCase
 
         $this->assertNotNull($builder = $this->repository->create(Board::class, $attributes));
 
+        /** @noinspection SqlDialectInspection */
         $expected ='INSERT INTO boards (id_board, title) VALUES(:dcValue1, :dcValue2)';
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -356,6 +479,7 @@ class RepositoryTest extends TestCase
 
         $this->assertNotNull($builder = $this->repository->update(Board::class, 123, $updated));
 
+        /** @noinspection SqlDialectInspection */
         $expected ='UPDATE boards SET title = :dcValue1, updated_at = :dcValue2 WHERE `boards`.`id_board`=:dcValue3';
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -374,6 +498,7 @@ class RepositoryTest extends TestCase
         $indexBind = ':index';
         $this->assertNotNull($builder = $this->repository->delete(Board::class, $indexBind));
 
+        /** @noinspection SqlDialectInspection */
         $expected ='DELETE FROM boards WHERE `boards`.`id_board`=' . $indexBind;
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -394,6 +519,7 @@ class RepositoryTest extends TestCase
             $otherIndexBind
         ));
 
+        /** @noinspection SqlDialectInspection */
         $expected = "INSERT INTO comments_emotions (id_comment_fk, id_emotion_fk) VALUES($indexBind, $otherIndexBind)";
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -412,6 +538,7 @@ class RepositoryTest extends TestCase
             Comment::REL_EMOTIONS
         ));
 
+        /** @noinspection SqlDialectInspection */
         $expected = "DELETE FROM comments_emotions WHERE `comments_emotions`.`id_comment_fk`=$indexBind";
 
         $this->assertEquals($expected, $builder->getSQL());
