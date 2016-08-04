@@ -309,7 +309,7 @@ class Repository implements RepositoryInterface
                             $aliased       = $filterTable . $aliasId;
                             $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
                                 $this->buildTableColumn($aliased, $reverseFk);
-                            $builder->join($table, $filterTable, $aliased, $joinCondition);
+                            $builder->innerJoin($table, $filterTable, $aliased, $joinCondition);
                             if ($hasAppliedDistinct === false) {
                                 $this->distinct($builder, $modelClass);
                                 $hasAppliedDistinct = true;
