@@ -396,10 +396,10 @@ class Validator implements ValidatorInterface
      */
     private function createOptionalIdentity(RuleInterface $typeRule, RuleInterface $idRule)
     {
-        return self::arrayX([
+        return self::andX(self::isArray(), self::arrayX([
             DocumentInterface::KEYWORD_TYPE => $typeRule,
             DocumentInterface::KEYWORD_ID   => $idRule,
-        ])->disableAutoParameterNames();
+        ])->disableAutoParameterNames());
     }
 
     /**
@@ -410,9 +410,9 @@ class Validator implements ValidatorInterface
      */
     private function createSingleData($name, RuleInterface $identityRule)
     {
-        return static::arrayX([
+        return static::andX(static::isArray(), static::arrayX([
             DocumentInterface::KEYWORD_DATA => $identityRule,
-        ])->disableAutoParameterNames()->setParameterName($name);
+        ])->disableAutoParameterNames()->setParameterName($name));
     }
 
     /**
@@ -423,9 +423,9 @@ class Validator implements ValidatorInterface
      */
     private function createMultiData($name, RuleInterface $identityRule)
     {
-        return static::arrayX([
-            DocumentInterface::KEYWORD_DATA => static::eachX($identityRule),
-        ])->disableAutoParameterNames()->setParameterName($name);
+        return static::andX(static::isArray(), static::arrayX([
+            DocumentInterface::KEYWORD_DATA => static::andX(static::isArray(), static::eachX($identityRule)),
+        ])->disableAutoParameterNames()->setParameterName($name));
     }
 
     /**
