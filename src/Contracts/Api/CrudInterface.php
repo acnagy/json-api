@@ -51,7 +51,7 @@ interface CrudInterface
     /**
      * @param int|string $index
      *
-     * @return void
+     * @return int
      */
     public function delete($index);
 
@@ -68,7 +68,7 @@ interface CrudInterface
      * @param array      $attributes
      * @param array      $toMany
      *
-     * @return void
+     * @return int
      */
     public function update($index, array $attributes, array $toMany = []);
 

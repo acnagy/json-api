@@ -210,7 +210,9 @@ class Crud implements CrudInterface
 
         $builder = $this->builderOnDelete($this->getRepository()->delete($modelClass, $index));
 
-        $builder->execute();
+        $deleted = $builder->execute();
+
+        return (int)$deleted;
     }
 
     /**
@@ -250,6 +252,7 @@ class Crud implements CrudInterface
      */
     public function update($index, array $attributes, array $toMany = [])
     {
+        $updated    = 0;
         $modelClass = $this->getModelClass();
 
         $allowedChanges = $this->filterAttributesOnUpdate($modelClass, $attributes);
@@ -257,8 +260,8 @@ class Crud implements CrudInterface
         $saveMain = $this->getRepository()->update($modelClass, $index, $allowedChanges);
         $saveMain = $this->builderSaveResourceOnUpdate($saveMain);
         $saveMain->getSQL(); // prepare
-        $this->inTransaction(function () use ($modelClass, $saveMain, $toMany, $index) {
-            $saveMain->execute();
+        $this->inTransaction(function () use ($modelClass, $saveMain, $toMany, $index, &$updated) {
+            $updated = $saveMain->execute();
             foreach ($toMany as $name => $values) {
                 $indexBind      = ':index';
                 $otherIndexBind = ':otherIndex';
@@ -276,6 +279,8 @@ class Crud implements CrudInterface
                 }
             }
         });
+
+        return (int)$updated;
     }
 
     /**
