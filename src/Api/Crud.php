@@ -208,7 +208,9 @@ class Crud implements CrudInterface
     {
         $modelClass = $this->getModelClass();
 
-        $this->getRepository()->delete($modelClass, $index)->execute();
+        $builder = $this->builderOnDelete($this->getRepository()->delete($modelClass, $index));
+
+        $builder->execute();
     }
 
     /**
@@ -509,6 +511,16 @@ class Crud implements CrudInterface
         $relationshipName,
         QueryBuilder $builder
     ) {
+        return $builder;
+    }
+
+    /**
+     * @param QueryBuilder $builder
+     *
+     * @return QueryBuilder
+     */
+    protected function builderOnDelete(QueryBuilder $builder)
+    {
         return $builder;
     }
 
