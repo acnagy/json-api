@@ -39,7 +39,7 @@ class JsonApiResponse extends Response
      */
     public function __construct($content, $status = 200, array $headers = [])
     {
-        $headers = $this->injectContentType(MediaTypeInterface::JSON_API_TYPE, $headers);
+        $headers = $this->injectContentType(MediaTypeInterface::JSON_API_MEDIA_TYPE, $headers);
 
         parent::__construct($this->createBody($content), $status, $headers);
     }
