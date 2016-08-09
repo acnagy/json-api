@@ -18,12 +18,12 @@
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
+use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Factory;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\ModelSchemes;
-use Limoncello\Models\RelationshipTypes;
+use Limoncello\JsonApi\Models\ModelSchemes;
+use Limoncello\JsonApi\Models\RelationshipTypes;
 use Limoncello\Tests\JsonApi\Data\Migrations\Runner as MigrationRunner;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;

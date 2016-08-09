@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Contracts\Api;
+<?php namespace Limoncello\JsonApi\Types;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,21 +16,34 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
-use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
+use DateTime;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
+use Doctrine\DBAL\Types\Type;
 
 /**
  * @package Limoncello\JsonApi
  */
-interface ModelsDataInterface
+abstract class DateTimeBaseType extends Type
 {
-    /**
-     * @return PaginatedDataInterface
-     */
-    public function getPaginatedData();
+    /** Type name */
+    const NAME = null;
+
+    /** DateTime format */
+    const JSON_API_FORMAT = DateTime::ISO8601;
 
     /**
-     * @return RelationshipStorageInterface|null
+     * @inheritdoc
      */
-    public function getRelationshipStorage();
+    public function getName()
+    {
+        return static::NAME;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function getSQLDeclaration(array $fieldDeclaration, AbstractPlatform $platform)
+    {
+        return $platform->getDateTimeTypeDeclarationSQL($fieldDeclaration);
+    }
 }

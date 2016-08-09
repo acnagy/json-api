@@ -19,14 +19,15 @@
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Query\Expression\CompositeExpression;
 use Doctrine\DBAL\Query\QueryBuilder;
+use Doctrine\DBAL\Types\Type;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\Http\Query\FilterParameterInterface;
 use Limoncello\JsonApi\Contracts\Http\Query\SortParameterInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
-use Limoncello\Models\RelationshipTypes;
+use Limoncello\JsonApi\Models\RelationshipTypes;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
@@ -104,14 +105,22 @@ class Repository implements RepositoryInterface
 
     /**
      * @inheritdoc
+     *
+     * @SuppressWarnings(PHPMD.StaticAccess)
      */
     public function create($modelClass, array $attributes)
     {
-        $builder = $this->getConnection()->createQueryBuilder();
+        $connection = $this->getConnection();
+        $dbPlatform = $connection->getDatabasePlatform();
+        $builder    = $connection->createQueryBuilder();
+        $types      = $this->getModelSchemes()->getAttributeTypes($modelClass);
 
         $valuesAsParams = [];
         foreach ($attributes as $column => $value) {
-            $valuesAsParams[$column] = $builder->createNamedParameter((string)$value);
+            $type     = Type::getType($types[$column]);
+            $pdoType  = $type->getBindingType();
+            $pdoValue = $type->convertToDatabaseValue($value, $dbPlatform);
+            $valuesAsParams[$column] = $builder->createNamedParameter($pdoValue, $pdoType);
         }
 
         $builder
@@ -245,6 +254,8 @@ class Repository implements RepositoryInterface
      *
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      * @SuppressWarnings(PHPMD.ElseExpression)
+     * @SuppressWarnings(PHPMD.NPathComplexity)
+     * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
      */
     public function applyFilters(
         ErrorCollection $errors,

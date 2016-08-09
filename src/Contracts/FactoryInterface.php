@@ -22,20 +22,19 @@ use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
+use Limoncello\JsonApi\Contracts\Models\ModelStorageInterface;
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
+use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
+use Limoncello\JsonApi\Contracts\Models\TagStorageInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
-use Limoncello\Models\Contracts\FactoryInterface as ModelsFactoryInterface;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
-use Limoncello\Models\Contracts\ModelStorageInterface;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\TagStorageInterface;
 use Neomerx\JsonApi\Encoder\EncoderOptions;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
  * @package Limoncello\JsonApi
  */
-interface FactoryInterface extends ModelsFactoryInterface
+interface FactoryInterface
 {
     /**
      * @return ErrorCollection
@@ -105,4 +104,10 @@ interface FactoryInterface extends ModelsFactoryInterface
      * @return EncoderInterface
      */
     public function createEncoder(JsonSchemesInterface $schemes, EncoderOptions $encoderOptions = null);
+    /**
+     * @param mixed $data
+     *
+     * @return PaginatedDataInterface
+     */
+    public function createPaginatedData($data);
 }

@@ -18,9 +18,9 @@
 
 use Doctrine\DBAL\Connection;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as JsonApiTranslatorInterface;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Validation\Validator;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
 use Limoncello\Tests\JsonApi\Data\Models\Post;
 use Limoncello\Tests\JsonApi\Data\Models\Role;

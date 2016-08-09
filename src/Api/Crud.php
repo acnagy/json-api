@@ -19,20 +19,22 @@
 use ArrayObject;
 use Closure;
 use Doctrine\DBAL\Driver\PDOConnection;
+use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Query\QueryBuilder;
+use Doctrine\DBAL\Types\Type;
 use Generator;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\Api\CrudInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\Http\Query\IncludeParameterInterface;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
+use Limoncello\JsonApi\Contracts\Models\ModelStorageInterface;
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
+use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
+use Limoncello\JsonApi\Contracts\Models\TagStorageInterface;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
-use Limoncello\Models\Contracts\ModelStorageInterface;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Contracts\TagStorageInterface;
-use Limoncello\Models\RelationshipTypes;
+use Limoncello\JsonApi\Models\RelationshipTypes;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
 use Neomerx\JsonApi\Exceptions\JsonApiException as E;
@@ -348,24 +350,9 @@ class Crud implements CrudInterface
     protected function fetchSingleData(QueryBuilder $builder, $class)
     {
         $model = $this->fetchSingle($builder, $class);
-        $data  = $this->getFactory()->createPaginatedData($model, false, false);
+        $data  = $this->getFactory()->createPaginatedData($model);
 
         return $data;
-    }
-
-    /**
-     * @param QueryBuilder $builder
-     * @param string       $class
-     *
-     * @return mixed
-     */
-    protected function fetchSingle(QueryBuilder $builder, $class)
-    {
-        $statement = $builder->execute();
-        $statement->setFetchMode(PDOConnection::FETCH_CLASS, $class);
-        $model = $statement->fetch();
-
-        return $model !== false ? $model : null;
     }
 
     /**
@@ -380,9 +367,35 @@ class Crud implements CrudInterface
     {
         list($models, $hasMore, $limit, $offset) = $this->fetchCollection($builder, $class, $limit, $offset);
 
-        $data = $this->getFactory()->createPaginatedData($models, true, $hasMore, $offset, $limit);
+        $data = $this->getFactory()
+            ->createPaginatedData($models)
+            ->setIsCollection(true)
+            ->setHasMoreItems($hasMore)
+            ->setOffset($offset)
+            ->setLimit($limit);
 
         return $data;
+    }
+
+    /**
+     * @param QueryBuilder $builder
+     * @param string       $class
+     *
+     * @return mixed|null
+     */
+    protected function fetchSingle(QueryBuilder $builder, $class)
+    {
+        $statement = $builder->execute();
+        $statement->setFetchMode(PDOConnection::FETCH_ASSOC);
+        $platform = $builder->getConnection()->getDatabasePlatform();
+        $types    = $this->getModelSchemes()->getAttributeTypeInstances($class);
+
+        $model = null;
+        if (($attributes = $statement->fetch()) !== false) {
+            $model = $this->readInstanceFromAssoc($class, $attributes, $types, $platform);
+        }
+
+        return $model;
     }
 
     /**
@@ -396,8 +409,14 @@ class Crud implements CrudInterface
     protected function fetchCollection(QueryBuilder $builder, $class, $limit, $offset)
     {
         $statement = $builder->execute();
-        $statement->setFetchMode(PDOConnection::FETCH_CLASS, $class);
-        $models = $statement->fetchAll();
+        $statement->setFetchMode(PDOConnection::FETCH_ASSOC);
+        $platform = $builder->getConnection()->getDatabasePlatform();
+        $types    = $this->getModelSchemes()->getAttributeTypeInstances($class);
+
+        $models = [];
+        while (($attributes = $statement->fetch()) !== false) {
+            $models[] = $this->readInstanceFromAssoc($class, $attributes, $types, $platform);
+        }
 
         return $this->normalizePagingParams($models, $limit, $offset);
     }
@@ -485,6 +504,8 @@ class Crud implements CrudInterface
      * @param QueryBuilder $builder
      *
      * @return QueryBuilder
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     protected function builderSaveRelationshipOnCreate(/** @noinspection PhpUnusedParameterInspection */
         $relationshipName,
@@ -498,6 +519,8 @@ class Crud implements CrudInterface
      * @param QueryBuilder $builder
      *
      * @return QueryBuilder
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     protected function builderSaveRelationshipOnUpdate(/** @noinspection PhpUnusedParameterInspection */
         $relationshipName,
@@ -511,6 +534,8 @@ class Crud implements CrudInterface
      * @param QueryBuilder $builder
      *
      * @return QueryBuilder
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     protected function builderCleanRelationshipOnUpdate(/** @noinspection PhpUnusedParameterInspection */
         $relationshipName,
@@ -714,5 +739,28 @@ class Crud implements CrudInterface
                     break;
             }
         }
+    }
+
+    /**
+     * @param string           $class
+     * @param array            $attributes
+     * @param Type[]           $types
+     * @param AbstractPlatform $platform
+     *
+     * @return mixed|null
+     */
+    private function readInstanceFromAssoc($class, array $attributes, array $types, AbstractPlatform $platform)
+    {
+        $instance = new $class();
+        foreach ($attributes as $name => $value) {
+            if (array_key_exists($name, $types) === true) {
+                /** @var Type $type */
+                $type  = $types[$name];
+                $value = $type->convertToPHPValue($value, $platform);
+            }
+            $instance->{$name} = $value;
+        }
+
+        return $instance;
     }
 }

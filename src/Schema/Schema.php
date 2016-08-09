@@ -17,11 +17,11 @@
  */
 
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\RelationshipTypes;
+use Limoncello\JsonApi\Models\RelationshipTypes;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Document\LinkInterface;
 use Neomerx\JsonApi\Contracts\Factories\FactoryInterface;
@@ -173,7 +173,7 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
         $buildUrl = function ($offset) use ($data, $uri) {
             $paramsWithPaging = [
                 PaginationStrategyInterface::PARAM_PAGING_SKIP => $offset,
-                PaginationStrategyInterface::PARAM_PAGING_SIZE => $data->getSize(),
+                PaginationStrategyInterface::PARAM_PAGING_SIZE => $data->getLimit(),
             ];
             $fullUrl = $uri . '?' . http_build_query($paramsWithPaging);
 
@@ -185,7 +185,7 @@ abstract class Schema extends SchemaProvider implements SchemaInterface
         // It looks like relationship can only hold first data rows so we might need `next` link but never `prev`
 
         if ($data->hasMoreItems() === true) {
-            $offset = $data->getOffset() + $data->getSize();
+            $offset = $data->getOffset() + $data->getLimit();
             $links[DocumentInterface::KEYWORD_NEXT] = $this->createLink($buildUrl($offset));
         }
 

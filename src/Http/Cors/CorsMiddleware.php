@@ -91,6 +91,8 @@ class CorsMiddleware
      * @param AnalysisResultInterface $analysis
      *
      * @return ResponseInterface
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     protected static function getErrorNoHostHeaderResponse(
         /** @noinspection PhpUnusedParameterInspection */ AnalysisResultInterface $analysis
@@ -102,6 +104,8 @@ class CorsMiddleware
      * @param AnalysisResultInterface $analysis
      *
      * @return ResponseInterface
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     protected static function getErrorOriginNotAllowedResponse(
         /** @noinspection PhpUnusedParameterInspection */ AnalysisResultInterface $analysis
@@ -113,6 +117,8 @@ class CorsMiddleware
      * @param AnalysisResultInterface $analysis
      *
      * @return ResponseInterface
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     protected static function getErrorMethodNotSupportedResponse(
         /** @noinspection PhpUnusedParameterInspection */ AnalysisResultInterface $analysis
@@ -124,6 +130,8 @@ class CorsMiddleware
      * @param AnalysisResultInterface $analysis
      *
      * @return ResponseInterface
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     protected static function getErrorHeadersNotSupportedResponse(
         /** @noinspection PhpUnusedParameterInspection */ AnalysisResultInterface $analysis

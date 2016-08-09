@@ -22,18 +22,17 @@ use Limoncello\JsonApi\Api\ModelsData;
 use Limoncello\JsonApi\Contracts\Adapters\FilterOperationsInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
+use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Encoder\Encoder;
 use Limoncello\JsonApi\I18n\Translator;
+use Limoncello\JsonApi\Models\ModelStorage;
+use Limoncello\JsonApi\Models\PaginatedData;
+use Limoncello\JsonApi\Models\RelationshipStorage;
+use Limoncello\JsonApi\Models\TagStorage;
 use Limoncello\JsonApi\Schema\JsonSchemes;
-use Limoncello\Models\Contracts\FactoryInterface as ModelsFactoryInterface;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
-use Limoncello\Models\Factory as ModelsFactory;
-use Limoncello\Models\ModelStorage;
-use Limoncello\Models\RelationshipStorage;
-use Limoncello\Models\TagStorage;
 use Neomerx\JsonApi\Contracts\Factories\FactoryInterface as JsonApiFactoryInterface;
 use Neomerx\JsonApi\Encoder\EncoderOptions;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
@@ -48,26 +47,9 @@ use Neomerx\JsonApi\Factories\Factory as JsonApiFactory;
 class Factory implements FactoryInterface
 {
     /**
-     * @var ModelsFactoryInterface
-     */
-    private $modelsFactory = null;
-
-    /**
      * @var JsonApiFactoryInterface
      */
     private $jsonApiFactory = null;
-
-    /**
-     * @return ModelsFactoryInterface
-     */
-    public function getModelsFactory()
-    {
-        if ($this->modelsFactory === null) {
-            $this->modelsFactory = new ModelsFactory();
-        }
-
-        return $this->modelsFactory;
-    }
 
     /**
      * @return JsonApiFactoryInterface
@@ -82,24 +64,13 @@ class Factory implements FactoryInterface
     }
 
     /**
-     * @param mixed    $data
-     * @param bool     $isCollection
-     * @param bool     $hasMoreItems
-     * @param int|null $offset
-     * @param int|null $size
+     * @param mixed $data
      *
      * @return PaginatedDataInterface
-     *
-     * @SuppressWarnings(PHPMD.BooleanArgumentFlag)
      */
-    public function createPaginatedData(
-        $data,
-        $isCollection = false,
-        $hasMoreItems = false,
-        $offset = null,
-        $size = null
-    ) {
-        return $this->getModelsFactory()->createPaginatedData($data, $isCollection, $hasMoreItems, $offset, $size);
+    public function createPaginatedData($data)
+    {
+        return new PaginatedData($data);
     }
 
     /**
@@ -115,7 +86,7 @@ class Factory implements FactoryInterface
      */
     public function createRelationshipStorage()
     {
-        return new RelationshipStorage($this->getModelsFactory());
+        return new RelationshipStorage($this);
     }
 
     /**

@@ -18,11 +18,11 @@
 
 use Generator;
 use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as T;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
 use Limoncello\JsonApi\Contracts\Validation\ValidatorInterface;
 use Limoncello\JsonApi\Http\JsonApiResponse;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
 use Limoncello\Validation\Captures\CaptureAggregator;
 use Limoncello\Validation\Contracts\CaptureAggregatorInterface;
 use Limoncello\Validation\Contracts\RuleInterface;

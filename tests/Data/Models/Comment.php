@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-use Limoncello\Models\FieldTypes;
-use Limoncello\Models\RelationshipTypes;
+use Doctrine\DBAL\Types\Type;
+use Limoncello\JsonApi\Models\RelationshipTypes;
+use Limoncello\Tests\JsonApi\Data\Types\SystemDateTimeType;
 
 /**
  * @package Limoncello\Tests\JsonApi
@@ -48,19 +49,22 @@ class Comment extends Model
     /** Field name */
     const FIELD_TEXT = 'text';
 
+    /** Length constant */
+    const LENGTH_TEXT = 255;
+
     /**
      * @inheritdoc
      */
     public static function getAttributeTypes()
     {
         return [
-            self::FIELD_ID         => FieldTypes::INT,
-            self::FIELD_ID_POST    => FieldTypes::INT,
-            self::FIELD_ID_USER    => FieldTypes::INT,
-            self::FIELD_TEXT       => FieldTypes::TEXT,
-            self::FIELD_CREATED_AT => FieldTypes::DATE,
-            self::FIELD_UPDATED_AT => FieldTypes::DATE,
-            self::FIELD_DELETED_AT => FieldTypes::DATE,
+            self::FIELD_ID         => Type::INTEGER,
+            self::FIELD_ID_POST    => Type::INTEGER,
+            self::FIELD_ID_USER    => Type::INTEGER,
+            self::FIELD_TEXT       => Type::STRING,
+            self::FIELD_CREATED_AT => SystemDateTimeType::NAME,
+            self::FIELD_UPDATED_AT => SystemDateTimeType::NAME,
+            self::FIELD_DELETED_AT => SystemDateTimeType::NAME,
         ];
     }
 

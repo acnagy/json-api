@@ -20,8 +20,8 @@ use Closure;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
 use Neomerx\JsonApi\Contracts\Factories\FactoryInterface;
@@ -137,12 +137,12 @@ class Encoder extends \Neomerx\JsonApi\Encoder\Encoder implements EncoderInterfa
             $this->getOriginalUri() !== null
         ) {
             $links       = [];
-            $linkClosure = $this->createLinkClosure($data->getSize());
+            $linkClosure = $this->createLinkClosure($data->getLimit());
 
             $prev = DocumentInterface::KEYWORD_PREV;
             $next = DocumentInterface::KEYWORD_NEXT;
-            $data->getOffset() <= 0 ?: $links[$prev] = $linkClosure(max(0, $data->getOffset() - $data->getSize()));
-            $data->hasMoreItems() === false ?: $links[$next] = $linkClosure($data->getOffset() + $data->getSize());
+            $data->getOffset() <= 0 ?: $links[$prev] = $linkClosure(max(0, $data->getOffset() - $data->getLimit()));
+            $data->hasMoreItems() === false ?: $links[$next] = $linkClosure($data->getOffset() + $data->getLimit());
 
             $this->withLinks($links);
         }

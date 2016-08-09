@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-use Limoncello\Models\FieldTypes;
+use Doctrine\DBAL\Types\Type;
+use Limoncello\Tests\JsonApi\Data\Types\SystemDateTimeType;
 
 /**
  * @package Limoncello\Tests\JsonApi
@@ -41,11 +42,11 @@ class CommentEmotion extends Model
     public static function getAttributeTypes()
     {
         return [
-            self::FIELD_ID         => FieldTypes::INT,
-            self::FIELD_ID_COMMENT => FieldTypes::INT,
-            self::FIELD_ID_EMOTION => FieldTypes::INT,
-            self::FIELD_CREATED_AT => FieldTypes::DATE,
-            self::FIELD_UPDATED_AT => FieldTypes::DATE,
+            self::FIELD_ID         => Type::INTEGER,
+            self::FIELD_ID_COMMENT => Type::INTEGER,
+            self::FIELD_ID_EMOTION => Type::INTEGER,
+            self::FIELD_CREATED_AT => SystemDateTimeType::NAME,
+            self::FIELD_UPDATED_AT => SystemDateTimeType::NAME,
         ];
     }
 

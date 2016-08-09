@@ -26,7 +26,7 @@ use Limoncello\JsonApi\Http\Query\FilterParameter;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
 use Limoncello\JsonApi\Http\Query\SortParameter;
 use Limoncello\JsonApi\I18n\Translator;
-use Limoncello\Models\RelationshipTypes;
+use Limoncello\JsonApi\Models\RelationshipTypes;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;

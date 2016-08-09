@@ -16,8 +16,9 @@
  * limitations under the License.
  */
 
-use Limoncello\Models\FieldTypes;
-use Limoncello\Models\RelationshipTypes;
+use Doctrine\DBAL\Types\Type;
+use Limoncello\JsonApi\Models\RelationshipTypes;
+use Limoncello\Tests\JsonApi\Data\Types\SystemDateTimeType;
 
 /**
  * @package Limoncello\Tests\JsonApi
@@ -72,19 +73,19 @@ class User extends Model
     public static function getAttributeTypes()
     {
         return [
-            self::FIELD_ID            => FieldTypes::INT,
-            self::FIELD_ID_ROLE       => FieldTypes::INT,
-            self::FIELD_TITLE         => FieldTypes::STRING,
-            self::FIELD_FIRST_NAME    => FieldTypes::STRING,
-            self::FIELD_LAST_NAME     => FieldTypes::STRING,
-            self::FIELD_EMAIL         => FieldTypes::STRING,
-            self::FIELD_IS_ACTIVE     => FieldTypes::BOOL,
-            self::FIELD_PASSWORD_HASH => FieldTypes::STRING,
-            self::FIELD_LANGUAGE      => FieldTypes::STRING,
-            self::FIELD_API_TOKEN     => FieldTypes::STRING,
-            self::FIELD_CREATED_AT    => FieldTypes::DATE,
-            self::FIELD_UPDATED_AT    => FieldTypes::DATE,
-            self::FIELD_DELETED_AT    => FieldTypes::DATE,
+            self::FIELD_ID            => Type::INTEGER,
+            self::FIELD_ID_ROLE       => Type::INTEGER,
+            self::FIELD_TITLE         => Type::STRING,
+            self::FIELD_FIRST_NAME    => Type::STRING,
+            self::FIELD_LAST_NAME     => Type::STRING,
+            self::FIELD_EMAIL         => Type::STRING,
+            self::FIELD_IS_ACTIVE     => Type::BOOLEAN,
+            self::FIELD_PASSWORD_HASH => Type::STRING,
+            self::FIELD_LANGUAGE      => Type::STRING,
+            self::FIELD_API_TOKEN     => Type::STRING,
+            self::FIELD_CREATED_AT    => SystemDateTimeType::NAME,
+            self::FIELD_UPDATED_AT    => SystemDateTimeType::NAME,
+            self::FIELD_DELETED_AT    => SystemDateTimeType::NAME,
         ];
     }
 

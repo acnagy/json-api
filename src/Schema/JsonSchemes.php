@@ -17,10 +17,10 @@
  */
 
 use Closure;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
+use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
 use Neomerx\JsonApi\Contracts\Schema\SchemaFactoryInterface;
 use Neomerx\JsonApi\Schema\Container;
 

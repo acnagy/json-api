@@ -17,8 +17,8 @@
  */
 
 use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
+use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
 
 /**
  * @package Limoncello\JsonApi

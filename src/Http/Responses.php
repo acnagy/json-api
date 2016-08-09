@@ -18,7 +18,7 @@
 
 use Limoncello\JsonApi\Contracts\Api\ModelsDataInterface;
 use Limoncello\JsonApi\Contracts\Encoder\EncoderInterface;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
 use Neomerx\JsonApi\Contracts\Encoder\Parameters\EncodingParametersInterface;
 use Neomerx\JsonApi\Contracts\Http\Headers\MediaTypeInterface;
 use Neomerx\JsonApi\Contracts\Http\Headers\SupportedExtensionsInterface;

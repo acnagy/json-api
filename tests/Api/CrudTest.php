@@ -17,6 +17,7 @@
  */
 
 use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Types\Type;
 use Limoncello\JsonApi\Adapters\FilterOperations;
 use Limoncello\JsonApi\Adapters\PaginationStrategy;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
@@ -27,7 +28,7 @@ use Limoncello\JsonApi\Http\Query\FilterParameter;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
 use Limoncello\JsonApi\Http\Query\IncludeParameter;
 use Limoncello\JsonApi\Http\Query\SortParameter;
-use Limoncello\Models\RelationshipTypes;
+use Limoncello\JsonApi\Models\RelationshipTypes;
 use Limoncello\Tests\JsonApi\Data\Api\CommentsApi;
 use Limoncello\Tests\JsonApi\Data\Api\PostsApi;
 use Limoncello\Tests\JsonApi\Data\Api\UsersApi;
@@ -39,6 +40,7 @@ use Limoncello\Tests\JsonApi\Data\Models\User;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\UserSchema;
+use Limoncello\Tests\JsonApi\Data\Types\SystemDateTimeType;
 use Limoncello\Tests\JsonApi\TestCase;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Document\ErrorInterface;
@@ -167,7 +169,7 @@ class CrudTest extends TestCase
         $this->assertCount(2, $emotions->getData());
         $this->assertFalse($emotions->hasMoreItems());
         $this->assertSame(null, $emotions->getOffset());
-        $this->assertSame(null, $emotions->getSize());
+        $this->assertSame(null, $emotions->getLimit());
     }
 
     /**
@@ -221,7 +223,7 @@ class CrudTest extends TestCase
         $this->assertCount(2, $emotions->getData());
         $this->assertFalse($emotions->hasMoreItems());
         $this->assertSame(null, $emotions->getOffset());
-        $this->assertSame(null, $emotions->getSize());
+        $this->assertSame(null, $emotions->getLimit());
     }
 
     /**
@@ -266,7 +268,7 @@ class CrudTest extends TestCase
         $comments    = $commentsRel->getData();
         $hasMore     = $commentsRel->hasMoreItems();
         $offset      = $commentsRel->getOffset();
-        $limit       = $commentsRel->getSize();
+        $limit       = $commentsRel->getLimit();
         $this->assertNotEmpty($comments);
         $this->assertCount(3, $comments);
         $this->assertEquals(Comment::class, get_class($comments[0]));
@@ -280,20 +282,20 @@ class CrudTest extends TestCase
         $this->assertCount(3, $emotions->getData());
         $this->assertTrue($emotions->hasMoreItems());
         $this->assertEquals(0, $emotions->getOffset());
-        $this->assertEquals(self::DEFAULT_PAGE, $emotions->getSize());
+        $this->assertEquals(self::DEFAULT_PAGE, $emotions->getLimit());
 
         $emotions = $relationships->getRelationship($comments[1], Comment::REL_EMOTIONS);
         $this->assertCount(1, $emotions->getData());
         $this->assertFalse($emotions->hasMoreItems());
         $this->assertSame(null, $emotions->getOffset());
-        $this->assertSame(null, $emotions->getSize());
+        $this->assertSame(null, $emotions->getLimit());
 
         $comment  = $comments[2];
         $emotions = $relationships->getRelationship($comment, Comment::REL_EMOTIONS);
         $this->assertCount(1, $emotions->getData());
         $this->assertFalse($emotions->hasMoreItems());
         $this->assertSame(null, $emotions->getOffset());
-        $this->assertSame(null, $emotions->getSize());
+        $this->assertSame(null, $emotions->getLimit());
 
         $this->assertNotNull($post = $relationships->getRelationship($comment, Comment::REL_POST)->getData());
         $this->assertNotNull($user = $relationships->getRelationship($post, Post::REL_USER)->getData());
@@ -350,7 +352,7 @@ class CrudTest extends TestCase
         $this->assertEquals(9, $data->getPaginatedData()->getData()[1]->{Post::FIELD_ID});
         $this->assertTrue($data->getPaginatedData()->isCollection());
         $this->assertEquals($pagingOffset, $data->getPaginatedData()->getOffset());
-        $this->assertEquals($pagingSize, $data->getPaginatedData()->getSize());
+        $this->assertEquals($pagingSize, $data->getPaginatedData()->getLimit());
 
         return [$data, $filteringParameters, $sortParameters, $includePaths, $pagingParameters];
     }
@@ -439,7 +441,7 @@ class CrudTest extends TestCase
         $this->assertEquals(85, $data->getData()[1]->{Comment::FIELD_ID});
         $this->assertTrue($data->isCollection());
         $this->assertEquals($pagingOffset, $data->getOffset());
-        $this->assertEquals($pagingSize, $data->getSize());
+        $this->assertEquals($pagingSize, $data->getLimit());
     }
 
     /**
@@ -536,6 +538,10 @@ class CrudTest extends TestCase
 
         $relPaging = new PaginationStrategy(self::DEFAULT_PAGE);
         $crud      = new $class($factory, $repository, $modelSchemes, $relPaging);
+
+        if (Type::hasType(SystemDateTimeType::NAME) === false) {
+            Type::addType(SystemDateTimeType::NAME, SystemDateTimeType::class);
+        }
 
         return $crud;
     }

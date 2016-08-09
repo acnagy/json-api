@@ -20,7 +20,7 @@ use Closure;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
 use Doctrine\DBAL\Schema\Table;
 use Doctrine\DBAL\Types\Type;
-use Limoncello\Models\RelationshipTypes;
+use Limoncello\JsonApi\Models\RelationshipTypes;
 use Limoncello\Tests\JsonApi\Data\Models\Model;
 use Limoncello\Tests\JsonApi\Data\Models\ModelInterface;
 

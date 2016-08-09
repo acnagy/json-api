@@ -22,7 +22,7 @@ use Limoncello\JsonApi\Api\Crud;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
 use Limoncello\JsonApi\Contracts\Adapters\RepositoryInterface;
 use Limoncello\JsonApi\Contracts\FactoryInterface;
-use Limoncello\Models\Contracts\ModelSchemesInterface;
+use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
 use Limoncello\Tests\JsonApi\Data\Models\Model;
 
 /**

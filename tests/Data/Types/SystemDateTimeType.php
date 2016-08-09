@@ -1,4 +1,4 @@
-<?php namespace Limoncello\JsonApi\Contracts\Api;
+<?php namespace Limoncello\Tests\JsonApi\Data\Types;
 
 /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
@@ -16,21 +16,11 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
-use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
+use Limoncello\JsonApi\Types\DateTimeStringType;
 
 /**
- * @package Limoncello\JsonApi
+ * @package Limoncello\Tests\JsonApi
  */
-interface ModelsDataInterface
+class SystemDateTimeType extends DateTimeStringType
 {
-    /**
-     * @return PaginatedDataInterface
-     */
-    public function getPaginatedData();
-
-    /**
-     * @return RelationshipStorageInterface|null
-     */
-    public function getRelationshipStorage();
 }

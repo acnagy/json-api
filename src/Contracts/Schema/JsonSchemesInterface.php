@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-use Limoncello\Models\Contracts\RelationshipStorageInterface;
+use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
 use Neomerx\JsonApi\Contracts\Schema\ContainerInterface;
 
 /**

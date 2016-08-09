@@ -1,6 +1,6 @@
-<?php namespace Limoncello\JsonApi\Contracts\Api;
+<?php namespace Limoncello\JsonApi\Contracts\Models;
 
-/**
+    /**
  * Copyright 2015-2016 info@neomerx.com (www.neomerx.com)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,21 +16,31 @@
  * limitations under the License.
  */
 
-use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
-use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
-
 /**
- * @package Limoncello\JsonApi
+ * @package Limoncello\Models
  */
-interface ModelsDataInterface
+interface ModelStorageInterface
 {
     /**
-     * @return PaginatedDataInterface
+     * @param mixed $model
+     *
+     * @return mixed
      */
-    public function getPaginatedData();
+    public function register($model);
 
     /**
-     * @return RelationshipStorageInterface|null
+     * @param string $class
+     * @param string $index
+     *
+     * @return bool
      */
-    public function getRelationshipStorage();
+    public function has($class, $index);
+
+    /**
+     * @param string $class
+     * @param string $index
+     *
+     * @return mixed
+     */
+    public function get($class, $index);
 }

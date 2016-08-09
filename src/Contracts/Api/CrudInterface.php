@@ -16,8 +16,8 @@
  * limitations under the License.
  */
 
+use Limoncello\JsonApi\Contracts\Models\PaginatedDataInterface;
 use Limoncello\JsonApi\Http\Query\FilterParameterCollection;
-use Limoncello\Models\Contracts\PaginatedDataInterface;
 
 /**
  * @package Limoncello\JsonApi
