@@ -275,7 +275,7 @@ class Validator implements ValidatorInterface
     ) {
         // will use primary column name as a capture name for `id`
         $captureName  = $this->getModelSchemes()->getPrimaryKey($schema::MODEL);
-        $idRule       = static::singleCapture($captureName, static::andX(static::required(), $idRule), $aggregator);
+        $idRule       = static::singleCapture($captureName, $idRule, $aggregator);
         $ignoreOthers = static::success();
         $rule         = static::arrayX([
             DocumentInterface::KEYWORD_DATA => static::arrayX([

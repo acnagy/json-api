@@ -194,7 +194,7 @@ EOT;
 
         $input = json_decode('{}', true);
 
-        $idRule = v::isNull();
+        $idRule = v::andX(v::required(), v::isNull());
         $attributeRules = [
             CommentSchema::ATTR_TEXT => v::andX(v::required(), v::andX(v::isString(), v::stringLength(1, 5))),
         ];
@@ -366,5 +366,54 @@ EOT;
             $errors[1]->getSource()[Error::SOURCE_POINTER]
         );
         $this->assertEquals('The `emotions-relationship` value should be an array.', $errors[1]->getDetail());
+    }
+
+    /**
+     * Validation test.
+     */
+    public function testCaptureInvalidData5()
+    {
+        $jsonApiTranslator    = new JsonApiTranslator();
+        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
+        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
+
+        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+
+        $input = json_decode('{}', true);
+
+        $idRule = v::isNull();
+        $attributeRules = [
+            CommentSchema::ATTR_TEXT => v::andX(v::required(), v::andX(v::isString(), v::stringLength(1, 5))),
+        ];
+        $toOneRules = [
+            CommentSchema::REL_USER => v::andX(v::isNumeric(), v::andX(v::moreThan(0), v::lessThan(2))),
+        ];
+        $toManyRules = [
+            CommentSchema::REL_EMOTIONS => v::andX(v::isNumeric(), v::andX(v::moreThan(0), v::lessThan(2))),
+        ];
+
+        $exception    = null;
+        $gotException = false;
+        $schema       = $jsonSchemes->getSchemaByType(Comment::class);
+        try {
+            $validator->assert($schema, $input, $idRule, $attributeRules, $toOneRules, $toManyRules);
+        } catch (JsonApiException $exception) {
+            $gotException = true;
+        }
+        $this->assertTrue($gotException);
+
+        $this->assertEquals(422, $exception->getHttpCode());
+
+        /** @var Error[] $errors */
+        $errors = $exception->getErrors()->getArrayCopy();
+        $this->assertCount(2, $errors);
+
+        $this->assertEquals(422, $errors[0]->getStatus());
+        $this->assertEquals('/data/type', $errors[0]->getSource()[Error::SOURCE_POINTER]);
+        $this->assertEquals('The `type` value is required.', $errors[0]->getDetail());
+
+        $this->assertEquals(422, $errors[1]->getStatus());
+        $this->assertEquals('/data/attributes/text-attribute', $errors[1]->getSource()[Error::SOURCE_POINTER]);
+        $this->assertEquals('The `text-attribute` value is required.', $errors[1]->getDetail());
     }
 }
