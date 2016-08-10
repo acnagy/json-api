@@ -475,19 +475,24 @@ class RepositoryTest extends TestCase
         $updated = [
             Board::FIELD_TITLE      => 'bbb',
             Board::FIELD_UPDATED_AT => '2000-01-02', // in real app it will be read-only and auto set
+            Board::FIELD_DELETED_AT => null,         // again, not realistic but we need to check `null`
         ];
 
         $this->assertNotNull($builder = $this->repository->update(Board::class, 123, $updated));
 
         /** @noinspection SqlDialectInspection */
-        $expected ='UPDATE boards SET title = :dcValue1, updated_at = :dcValue2 WHERE `boards`.`id_board`=:dcValue3';
+        $expected =
+            'UPDATE boards SET title = :dcValue1, updated_at = :dcValue2, deleted_at = :dcValue3 ' .
+            'WHERE `boards`.`id_board`=:dcValue4';
 
         $this->assertEquals($expected, $builder->getSQL());
         $this->assertEquals([
             'dcValue1'  => 'bbb',
             'dcValue2'  => '2000-01-02',
-            'dcValue3'  => '123',
+            'dcValue3'  => null,
+            'dcValue4'  => '123',
         ], $builder->getParameters());
+        $this->assertNull($builder->getParameters()['dcValue3']);
     }
 
     /**

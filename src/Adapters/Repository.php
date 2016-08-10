@@ -118,9 +118,8 @@ class Repository implements RepositoryInterface
         $valuesAsParams = [];
         foreach ($attributes as $column => $value) {
             $type     = Type::getType($types[$column]);
-            $pdoType  = $type->getBindingType();
             $pdoValue = $type->convertToDatabaseValue($value, $dbPlatform);
-            $valuesAsParams[$column] = $builder->createNamedParameter($pdoValue, $pdoType);
+            $valuesAsParams[$column] = $builder->createNamedParameter($pdoValue, $type->getBindingType());
         }
 
         $builder
@@ -161,17 +160,25 @@ class Repository implements RepositoryInterface
      */
     public function update($modelClass, $index, array $attributes)
     {
-        $builder = $this->getConnection()->createQueryBuilder();
+        $connection = $this->getConnection();
+        $dbPlatform = $connection->getDatabasePlatform();
+        $builder    = $this->getConnection()->createQueryBuilder();
+        $types      = $this->getModelSchemes()->getAttributeTypes($modelClass);
 
         $table = $this->getTableName($modelClass);
         $builder->update($table);
 
-        foreach ($attributes as $name => $value) {
-            $builder->set($name, $builder->createNamedParameter((string)$value));
+        foreach ($attributes as $column => $value) {
+            $type     = Type::getType($types[$column]);
+            $pdoValue = $type->convertToDatabaseValue($value, $dbPlatform);
+            $builder->set($column, $builder->createNamedParameter($pdoValue, $type->getBindingType()));
         }
 
-        $pkColumn = $this->buildTableColumn($table, $this->getPrimaryKeyName($modelClass));
-        $builder->where($pkColumn . '=' . $builder->createNamedParameter($index));
+        $pkName   = $this->getPrimaryKeyName($modelClass);
+        $pkColumn = $this->buildTableColumn($table, $pkName);
+        $type     = Type::getType($types[$pkName]);
+        $pdoValue = $type->convertToDatabaseValue($index, $dbPlatform);
+        $builder->where($pkColumn . '=' . $builder->createNamedParameter($pdoValue, $type->getBindingType()));
 
         return $builder;
     }
