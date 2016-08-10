@@ -91,6 +91,54 @@ EOT;
         $this->assertEquals(9, $attrCaptures[Comment::FIELD_ID_USER]);
         $this->assertEquals([5, 12], $toManyCaptures[Comment::REL_EMOTIONS]);
     }
+    /**
+     * Validation test.
+     */
+    public function testCaptureNullInTo1Relationship()
+    {
+        $jsonApiTranslator    = new JsonApiTranslator();
+        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
+        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
+
+        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+
+        $text  = 'Outside every fat man there was an even fatter man trying to close in';
+        $jsonInput = <<<EOT
+        {
+            "data" : {
+                "type"  : "comments",
+                "attributes" : {
+                    "text-attribute"  : "$text"
+                },
+                "relationships" : {
+                    "user-relationship" : {
+                        "data" : null
+                    }
+                }
+            }
+        }
+EOT;
+        $input = json_decode($jsonInput, true);
+
+        $idRule = v::isNull();
+        $attributeRules = [
+            CommentSchema::ATTR_TEXT => v::andX(v::isString(), v::stringLength(1)),
+        ];
+        $toOneRules = [
+            CommentSchema::REL_USER => v::orX(
+                v::andX(v::isNumeric(), v::andX(v::moreThan(0), v::lessThan(15))),
+                v::isNull()
+            ),
+        ];
+
+        $schema = $jsonSchemes->getSchemaByType(Comment::class);
+        list ($idCaptures, $attrCaptures) = $validator->assert($schema, $input, $idRule, $attributeRules, $toOneRules);
+
+        $this->assertCount(0, $idCaptures);
+        $this->assertCount(2, $attrCaptures);
+        $this->assertEquals($text, $attrCaptures[Comment::FIELD_TEXT]);
+        $this->assertEquals(null, $attrCaptures[Comment::FIELD_ID_USER]);
+    }
 
     /**
      * Validation test.

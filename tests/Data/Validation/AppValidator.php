@@ -136,7 +136,7 @@ class AppValidator extends Validator
             return static::exists($this->getConnection(), Post::TABLE_NAME, Post::FIELD_ID, $index);
         };
 
-        return static::callableX($exists, $messageCode);
+        return static::andX(static::isNumeric(), static::callableX($exists, $messageCode));
     }
 
     /**

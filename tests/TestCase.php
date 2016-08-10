@@ -18,6 +18,7 @@
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
+use Doctrine\DBAL\Types\Type;
 use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
 use Limoncello\JsonApi\Contracts\Models\RelationshipStorageInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
@@ -39,6 +40,7 @@ use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\RoleSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\UserSchema;
 use Limoncello\Tests\JsonApi\Data\Seeds\Runner as SeedRunner;
+use Limoncello\Tests\JsonApi\Data\Types\SystemDateTimeType;
 use Mockery;
 use Neomerx\JsonApi\Contracts\Factories\FactoryInterface;
 
@@ -47,6 +49,21 @@ use Neomerx\JsonApi\Contracts\Factories\FactoryInterface;
  */
 class TestCase extends \PHPUnit_Framework_TestCase
 {
+    /**
+     * @inheritdoc
+     */
+    protected function setUp()
+    {
+        parent::setUp();
+
+        if (Type::hasType(SystemDateTimeType::NAME) === false) {
+            Type::addType(SystemDateTimeType::NAME, SystemDateTimeType::class);
+        }
+    }
+
+    /**
+     * @inheritdoc
+     */
     protected function tearDown()
     {
         parent::tearDown();

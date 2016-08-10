@@ -346,19 +346,21 @@ class Validator implements ValidatorInterface
             $modelRelName   = $schema->getRelationshipMapping($name);
             $captureName    = $this->getModelSchemes()->getForeignKey($modelClass, $modelRelName);
             $expectedSchema = $this->getJsonSchemes()->getModelRelationshipSchema($modelClass, $modelRelName);
-            $relationshipCaptures[$name] = $this->createSingleData($name, $this->createOptionalIdentity(
+            $relationshipCaptures[$name] = $this->createSingleData(
+                $name,
                 static::equals($expectedSchema::TYPE),
                 static::singleCapture($captureName, $rule, $toOneAggregator)
-            ));
+            );
         }
         foreach ($toManyRules as $name => $rule) {
             $modelRelName   = $schema->getRelationshipMapping($name);
             $expectedSchema = $this->getJsonSchemes()->getModelRelationshipSchema($modelClass, $modelRelName);
             $captureName    = $modelRelName;
-            $relationshipCaptures[$name] = $this->createMultiData($name, $this->createOptionalIdentity(
+            $relationshipCaptures[$name] = $this->createMultiData(
+                $name,
                 static::equals($expectedSchema::TYPE),
                 static::multiCapture($captureName, $rule, $toManyAggregator)
-            ));
+            );
         }
 
         return $relationshipCaptures;
@@ -404,25 +406,32 @@ class Validator implements ValidatorInterface
 
     /**
      * @param string        $name
-     * @param RuleInterface $identityRule
+     * @param RuleInterface $typeRule
+     * @param RuleInterface $idRule
      *
      * @return RuleInterface
      */
-    private function createSingleData($name, RuleInterface $identityRule)
+    private function createSingleData($name, RuleInterface $typeRule, RuleInterface $idRule)
     {
+        $identityRule  = $this->createOptionalIdentity($typeRule, $idRule);
+        $nullValueRule = static::andX($idRule, static::isNull());
+
         return static::andX(static::isArray(), static::arrayX([
-            DocumentInterface::KEYWORD_DATA => $identityRule,
+            DocumentInterface::KEYWORD_DATA => static::orX($identityRule, $nullValueRule),
         ])->disableAutoParameterNames()->setParameterName($name));
     }
 
     /**
      * @param string        $name
-     * @param RuleInterface $identityRule
+     * @param RuleInterface $typeRule
+     * @param RuleInterface $idRule
      *
      * @return RuleInterface
      */
-    private function createMultiData($name, RuleInterface $identityRule)
+    private function createMultiData($name, RuleInterface $typeRule, RuleInterface $idRule)
     {
+        $identityRule = $this->createOptionalIdentity($typeRule, $idRule);
+
         return static::andX(static::isArray(), static::arrayX([
             DocumentInterface::KEYWORD_DATA => static::andX(static::isArray(), static::eachX($identityRule)),
         ])->disableAutoParameterNames()->setParameterName($name));

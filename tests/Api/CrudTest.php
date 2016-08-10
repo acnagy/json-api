@@ -17,7 +17,6 @@
  */
 
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\Types\Type;
 use Limoncello\JsonApi\Adapters\FilterOperations;
 use Limoncello\JsonApi\Adapters\PaginationStrategy;
 use Limoncello\JsonApi\Contracts\Adapters\PaginationStrategyInterface;
@@ -40,7 +39,6 @@ use Limoncello\Tests\JsonApi\Data\Models\User;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\UserSchema;
-use Limoncello\Tests\JsonApi\Data\Types\SystemDateTimeType;
 use Limoncello\Tests\JsonApi\TestCase;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Contracts\Document\ErrorInterface;
@@ -538,10 +536,6 @@ class CrudTest extends TestCase
 
         $relPaging = new PaginationStrategy(self::DEFAULT_PAGE);
         $crud      = new $class($factory, $repository, $modelSchemes, $relPaging);
-
-        if (Type::hasType(SystemDateTimeType::NAME) === false) {
-            Type::addType(SystemDateTimeType::NAME, SystemDateTimeType::class);
-        }
 
         return $crud;
     }
