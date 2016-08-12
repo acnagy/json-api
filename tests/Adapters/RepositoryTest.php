@@ -566,7 +566,7 @@ class RepositoryTest extends TestCase
         $this->assertEquals(Post::class, $targetClass);
         $this->assertEquals(RelationshipTypes::BELONGS_TO, $relType);
 
-        $expected = 'SELECT `posts`.`id_post`, `posts`.`id_board_fk`, `posts`.`id_user_fk`, ' .
+        $expected = 'SELECT `posts`.`id_post`, `posts`.`id_board_fk`, `posts`.`id_user_fk`, `posts`.`id_editor_fk`, ' .
             '`posts`.`title`, `posts`.`text`, `posts`.`created_at`, `posts`.`updated_at`, `posts`.`deleted_at` '.
             'FROM posts INNER JOIN comments  ON `comments`.`id_post_fk`=`posts`.`id_post` ' .
             "WHERE `comments`.`id_comment`=$indexBind";

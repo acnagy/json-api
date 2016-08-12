@@ -34,6 +34,7 @@ class PostsMigration extends Migration
         $this->createTable(Model::TABLE_NAME, [
             $this->primaryInt(Model::FIELD_ID),
             $this->relationship(Model::REL_USER),
+            $this->nullableRelationship(Model::REL_EDITOR),
             $this->relationship(Model::REL_BOARD),
             $this->string(Model::FIELD_TITLE),
             $this->text(Model::FIELD_TEXT),

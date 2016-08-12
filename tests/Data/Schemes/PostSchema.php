@@ -39,6 +39,9 @@ class PostSchema extends BaseSchema
     const REL_USER = 'user-relationship';
 
     /** Relationship name */
+    const REL_EDITOR = 'editor-relationship';
+
+    /** Relationship name */
     const REL_BOARD = 'board-relationship';
 
     /** Relationship name */
@@ -58,6 +61,7 @@ class PostSchema extends BaseSchema
             ],
             self::SCHEMA_RELATIONSHIPS => [
                 self::REL_USER     => Model::REL_USER,
+                self::REL_EDITOR   => Model::REL_EDITOR,
                 self::REL_BOARD    => Model::REL_BOARD,
                 self::REL_COMMENTS => Model::REL_COMMENTS,
             ],

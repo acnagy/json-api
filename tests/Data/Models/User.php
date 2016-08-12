@@ -38,6 +38,9 @@ class User extends Model
     const REL_POSTS = 'posts';
 
     /** Relationship name */
+    const REL_EDITOR_POSTS = 'editor_posts';
+
+    /** Relationship name */
     const REL_COMMENTS = 'comments';
 
     /** Field name */

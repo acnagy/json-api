@@ -51,8 +51,9 @@ class SchemaTest extends TestCase
     {
         $post = new Post();
         $post->{Post::FIELD_ID}  = '1';
-        $post->{Post::FIELD_ID_USER}  = null;
-        $post->{Post::FIELD_ID_BOARD} = null;
+        $post->{Post::FIELD_ID_USER}   = null;
+        $post->{Post::FIELD_ID_EDITOR} = null;
+        $post->{Post::FIELD_ID_BOARD}  = null;
 
         $relationships = $this->schema->getRelationships($post, true, []);
         $this->assertNull($relationships[PostSchema::REL_USER][DocumentInterface::KEYWORD_DATA]);

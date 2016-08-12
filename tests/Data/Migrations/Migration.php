@@ -194,13 +194,14 @@ abstract class Migration
     /**
      * @param string $name
      * @param string $referredClass
+     * @param bool   $notNull
      *
      * @return Closure
      */
-    protected function foreignInt($name, $referredClass)
+    protected function foreignInt($name, $referredClass, $notNull = true)
     {
-        return function (Table $table) use ($name, $referredClass) {
-            $table->addColumn($name, Type::INTEGER)->setUnsigned(true)->setNotnull(true);
+        return function (Table $table) use ($name, $referredClass, $notNull) {
+            $table->addColumn($name, Type::INTEGER)->setUnsigned(true)->setNotnull($notNull);
             $tableName = $this->getTableNameForClass($referredClass);
             /** @var Model $referredClass*/
             assert('$tableName !== null', "Table name is not specified for model '$referredClass'.");
@@ -220,10 +221,30 @@ abstract class Migration
         $modelClass    = $this->getModelClass();
         $relationships = $modelClass::getRelationships();
         $relFound      = isset($relationships[RelationshipTypes::BELONGS_TO][$name]);
-        $relFound ?: null;
+        if ($relFound === false) {
+            assert('$relFound === true', "Belongs-to relationship '$name' not found.");
+        }
         assert('$relFound === true', "Belongs-to relationship '$name' not found.");
         list ($referencedClass, $foreignKey) = $relationships[RelationshipTypes::BELONGS_TO][$name];
         return $this->foreignInt($foreignKey, $referencedClass);
+    }
+
+    /**
+     * @param string $name
+     *
+     * @return Closure
+     */
+    protected function nullableRelationship($name)
+    {
+        /** @var ModelInterface $modelClass */
+        $modelClass    = $this->getModelClass();
+        $relationships = $modelClass::getRelationships();
+        $relFound      = isset($relationships[RelationshipTypes::BELONGS_TO][$name]);
+        if ($relFound === false) {
+            assert('$relFound === true', "Belongs-to relationship '$name' not found.");
+        }
+        list ($referencedClass, $foreignKey) = $relationships[RelationshipTypes::BELONGS_TO][$name];
+        return $this->foreignInt($foreignKey, $referencedClass, false);
     }
 
     /**

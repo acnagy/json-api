@@ -47,6 +47,10 @@ class ModelStorage implements ModelStorageInterface
      */
     public function register($model)
     {
+        if ($model === null) {
+            return null;
+        }
+
         $class  = get_class($model);
         $pkName = $this->schemaStorage->getPrimaryKey($class);
         $index  = $model->{$pkName};

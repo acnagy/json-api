@@ -606,12 +606,16 @@ class Crud implements CrudInterface
             if ($data->isCollection() === true) {
                 foreach ($data->getData() as $model) {
                     $uniqueModel = $modelStorage->register($model);
-                    $modelsAtPath->register($uniqueModel, static::$rootPath);
+                    if ($uniqueModel !== null) {
+                        $modelsAtPath->register($uniqueModel, static::$rootPath);
+                    }
                 }
             } else {
                 $model       = $data->getData();
                 $uniqueModel = $modelStorage->register($model);
-                $modelsAtPath->register($uniqueModel, static::$rootPath);
+                if ($uniqueModel !== null) {
+                    $modelsAtPath->register($uniqueModel, static::$rootPath);
+                }
             }
             $classAtPath[static::$rootPath] = get_class($model);
 
@@ -714,7 +718,9 @@ class Crud implements CrudInterface
                     foreach ($parents as $parent) {
                         $builder->setParameter(static::$indexBind, $parent->{$pkName});
                         $child = $deDup->register($this->fetchSingle($builder, $class));
-                        $modelsAtPath->register($child, $childrenPath);
+                        if ($child !== null) {
+                            $modelsAtPath->register($child, $childrenPath);
+                        }
                         $result->addToOneRelationship($parent, $name, $child);
                     }
                     break;
@@ -732,7 +738,9 @@ class Crud implements CrudInterface
                         foreach ($children as $child) {
                             $child = $deDup->register($child);
                             $modelsAtPath->register($child, $childrenPath);
-                            $deDupedChildren[] = $child;
+                            if ($child !== null) {
+                                $deDupedChildren[] = $child;
+                            }
                         }
                         $result->addToManyRelationship($parent, $name, $deDupedChildren, $hasMore, $offset, $limit);
                     }

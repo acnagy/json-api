@@ -304,6 +304,34 @@ class CrudTest extends TestCase
     }
 
     /**
+     * Check 'read' with included paths where could be nulls.
+     */
+    public function testReadWithNullableInclude()
+    {
+        $crud = $this->createCrud(PostsApi::class);
+
+        $index = 18;
+
+        // check that editor relationship for selected post is `null`
+        /** @noinspection SqlDialectInspection */
+        $query   = 'SELECT ' . Post::FIELD_ID_EDITOR . ' FROM ' . Post::TABLE_NAME .
+            ' WHERE ' . Post::FIELD_ID . " = $index";
+        $idEditor = $this->connection->query($query)->fetch(PDO::FETCH_NUM)[0];
+        $this->assertNull($idEditor);
+
+        $includePaths = [
+            new IncludeParameter(PostSchema::REL_EDITOR, [Post::REL_EDITOR]),
+        ];
+
+        $data = $crud->read($index, null, $includePaths);
+
+        $this->assertNotNull($data);
+        $this->assertNotNull($model = $data->getPaginatedData()->getData());
+        $this->assertFalse($data->getPaginatedData()->isCollection());
+        $this->assertNull($data->getRelationshipStorage()->getRelationship($model, Post::REL_EDITOR)->getData());
+    }
+
+    /**
      * Test index.
      */
     public function testIndex()
