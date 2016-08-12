@@ -75,6 +75,11 @@ class Repository implements RepositoryInterface
     private $translator;
 
     /**
+     * @var int
+     */
+    private $aliasIdCounter = 0;
+
+    /**
      * @param Connection                $connection
      * @param ModelSchemesInterface     $modelSchemes
      * @param FilterOperationsInterface $filterOperations
@@ -276,8 +281,6 @@ class Repository implements RepositoryInterface
 
         $whereLink = $filterParams->isWithAnd() === true ? $builder->expr()->andX() : $builder->expr()->orX();
 
-        // join tables need unique aliases. this index is used for making them.
-        $aliasId            = 0;
         // while joining tables we select distinct rows. this flag used to apply `distinct` no more than once.
         $hasAppliedDistinct = false;
         $table              = $this->getTableName($modelClass);
@@ -307,8 +310,6 @@ class Repository implements RepositoryInterface
                 $filterColumn = null;
                 $lcOp = strtolower((string)$operation);
 
-                $aliasId++;
-
                 if ($filterParam->isIsRelationship() === true) {
                     // param for relationship
                     switch ($filterParam->getRelationshipType()) {
@@ -324,7 +325,7 @@ class Repository implements RepositoryInterface
                             $filterTable   = $modelSchemes->getTable($reverseClass);
                             $reverseFk     = $modelSchemes->getForeignKey($reverseClass, $reverseName);
                             $filterColumn  = $modelSchemes->getPrimaryKey($reverseClass);
-                            $aliased       = $filterTable . $aliasId;
+                            $aliased       = $filterTable . $this->getNewAliasId();
                             $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
                                 $this->buildTableColumn($aliased, $reverseFk);
                             $builder->innerJoin($table, $filterTable, $aliased, $joinCondition);
@@ -339,7 +340,7 @@ class Repository implements RepositoryInterface
                             list ($filterTable, $reversePk , $filterColumn) = $modelSchemes
                                 ->getBelongsToManyRelationship($modelClass, $filterParam->getName());
                             $primaryKey    = $modelSchemes->getPrimaryKey($modelClass);
-                            $aliased       = $filterTable . $aliasId;
+                            $aliased       = $filterTable . $this->getNewAliasId();
                             $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
                                 $this->buildTableColumn($aliased, $reversePk);
                             $builder->innerJoin($table, $filterTable, $aliased, $joinCondition);
@@ -637,14 +638,15 @@ class Repository implements RepositoryInterface
 
         $builder = $this->getConnection()->createQueryBuilder();
 
-        $joinCondition = $this->buildTableColumn($table, $foreignKey) . '=' .
-            $this->buildTableColumn($oneTable, $onePrimaryKey);
+        $aliased       = $table . $this->getNewAliasId();
+        $joinCondition = $this->buildTableColumn($oneTable, $onePrimaryKey) . '=' .
+            $this->buildTableColumn($aliased, $foreignKey);
         $builder
             ->select($this->getColumns($oneClass))
             ->from($oneTable)
-            ->innerJoin($oneTable, $table, null, $joinCondition);
+            ->innerJoin($oneTable, $table, $aliased, $joinCondition);
 
-        return [$builder, $oneClass, $this->getTableName($modelClass), $this->getPrimaryKeyName($modelClass)];
+        return [$builder, $oneClass, $aliased, $this->getPrimaryKeyName($modelClass)];
     }
 
     /**
@@ -681,14 +683,23 @@ class Repository implements RepositoryInterface
         $reverseTable = $this->getModelSchemes()->getTable($reverseClass);
         $reversePk    = $this->getModelSchemes()->getPrimaryKey($reverseClass);
 
+        $aliased       = $intermediateTable . $this->getNewAliasId();
         $joinCondition = $this->buildTableColumn($reverseTable, $reversePk) . '=' .
-            $this->buildTableColumn($intermediateTable, $reverseForeignKey);
+            $this->buildTableColumn($aliased, $reverseForeignKey);
         $builder       = $this->getConnection()->createQueryBuilder();
         $builder
             ->select($this->getColumns($reverseClass))
             ->from($reverseTable)
-            ->innerJoin($reverseTable, $intermediateTable, null, $joinCondition);
+            ->innerJoin($reverseTable, $intermediateTable, $aliased, $joinCondition);
 
-        return [$builder, $reverseClass, $intermediateTable, $foreignKey];
+        return [$builder, $reverseClass, $aliased, $foreignKey];
+    }
+
+    /**
+     * @return int
+     */
+    private function getNewAliasId()
+    {
+        return ++$this->aliasIdCounter;
     }
 }

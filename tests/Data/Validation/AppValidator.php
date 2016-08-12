@@ -21,6 +21,7 @@ use Limoncello\JsonApi\Contracts\I18n\TranslatorInterface as JsonApiTranslatorIn
 use Limoncello\JsonApi\Contracts\Models\ModelSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Validation\Validator;
+use Limoncello\Tests\JsonApi\Data\Models\Category;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
 use Limoncello\Tests\JsonApi\Data\Models\Post;
 use Limoncello\Tests\JsonApi\Data\Models\Role;
@@ -134,6 +135,20 @@ class AppValidator extends Validator
     {
         $exists = function ($index) {
             return static::exists($this->getConnection(), Post::TABLE_NAME, Post::FIELD_ID, $index);
+        };
+
+        return static::andX(static::isNumeric(), static::callableX($exists, $messageCode));
+    }
+
+    /**
+     * @param int $messageCode
+     *
+     * @return RuleInterface
+     */
+    public function optionalCategoryId($messageCode = MessageCodes::INVALID_VALUE)
+    {
+        $exists = function ($index) {
+            return static::exists($this->getConnection(), Category::TABLE_NAME, Category::FIELD_ID, $index);
         };
 
         return static::andX(static::isNumeric(), static::callableX($exists, $messageCode));

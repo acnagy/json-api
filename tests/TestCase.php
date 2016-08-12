@@ -27,6 +27,7 @@ use Limoncello\JsonApi\Models\ModelSchemes;
 use Limoncello\JsonApi\Models\RelationshipTypes;
 use Limoncello\Tests\JsonApi\Data\Migrations\Runner as MigrationRunner;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
+use Limoncello\Tests\JsonApi\Data\Models\Category;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
 use Limoncello\Tests\JsonApi\Data\Models\Model;
@@ -34,6 +35,7 @@ use Limoncello\Tests\JsonApi\Data\Models\Post;
 use Limoncello\Tests\JsonApi\Data\Models\Role;
 use Limoncello\Tests\JsonApi\Data\Models\User;
 use Limoncello\Tests\JsonApi\Data\Schemes\BoardSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\CategorySchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\EmotionSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
@@ -159,6 +161,7 @@ class TestCase extends \PHPUnit_Framework_TestCase
             Post::class,
             Role::class,
             User::class,
+            Category::class,
         ]);
 
         return $modelSchemes;
@@ -195,11 +198,12 @@ class TestCase extends \PHPUnit_Framework_TestCase
             ) {
                 return new BoardSchema($factory, $container, $modelSchemes);
             },
-            Comment::class => CommentSchema::class,
-            Emotion::class => EmotionSchema::class,
-            Post::class    => PostSchema::class,
-            Role::class    => RoleSchema::class,
-            User::class    => UserSchema::class,
+            Comment::class  => CommentSchema::class,
+            Emotion::class  => EmotionSchema::class,
+            Post::class     => PostSchema::class,
+            Role::class     => RoleSchema::class,
+            User::class     => UserSchema::class,
+            Category::class => CategorySchema::class,
         ];
     }
 }

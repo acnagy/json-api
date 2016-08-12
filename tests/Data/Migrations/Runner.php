@@ -34,6 +34,7 @@ class Runner
         PostsMigration::class,
         CommentsMigration::class,
         CommentEmotionsMigration::class,
+        CategoriesMigration::class,
     ];
 
     /**

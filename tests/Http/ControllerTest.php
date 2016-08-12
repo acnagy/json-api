@@ -34,11 +34,13 @@ use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Factory;
 use Limoncello\Tests\JsonApi\Data\Api\CommentsApi;
 use Limoncello\Tests\JsonApi\Data\Http\BoardsController;
+use Limoncello\Tests\JsonApi\Data\Http\CategoriesController;
 use Limoncello\Tests\JsonApi\Data\Http\CommentsController;
 use Limoncello\Tests\JsonApi\Data\Http\UsersController;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\CommentEmotion;
 use Limoncello\Tests\JsonApi\Data\Schemes\BoardSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\CategorySchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\EmotionSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\UserSchema;
@@ -332,6 +334,42 @@ class ControllerTest extends TestCase
         $this->assertTrue(isset($resource['data'][2]['relationships']['posts-relationship']['links']['next']));
         $link = $resource['data'][2]['relationships']['posts-relationship']['links']['next'];
         $this->assertEquals('/boards/3/relationships/posts-relationship?skip=3&size=3', $link);
+    }
+
+    /**
+     * Controller test.
+     */
+    public function testIncludeNullableRelationshipToItself()
+    {
+        $routeParams = [];
+        $queryParams = [
+            'include' => CategorySchema::REL_PARENT . ',' . CategorySchema::REL_CHILDREN,
+        ];
+        $container   = $this->createContainer();
+        $uri         = new Uri('http://localhost.local/categories?' . http_build_query($queryParams));
+        /** @var Mock $request */
+        $request = Mockery::mock(ServerRequestInterface::class);
+        $request->shouldReceive('getQueryParams')->once()->withNoArgs()->andReturn($queryParams);
+        $request->shouldReceive('getUri')->once()->withNoArgs()->andReturn($uri);
+
+        /** @var ServerRequestInterface $request */
+
+        $response = CategoriesController::index($routeParams, $container, $request);
+        $this->assertNotNull($response);
+        $this->assertEquals(200, $response->getStatusCode());
+
+        $body      = (string)($response->getBody());
+        $resources = json_decode($body, true);
+
+        // manually checked it should be 4 rows selected
+        $this->assertCount(3, $resources[DocumentInterface::KEYWORD_DATA]);
+        // check response sorted by post.id
+        $this->assertNull($resources['data'][0]['relationships']['parent-relationship']['data']['id']);
+        $this->assertCount(2, $resources['data'][0]['relationships']['children-relationship']['data']);
+        $this->assertEquals(1, $resources['data'][1]['relationships']['parent-relationship']['data']['id']);
+        $this->assertCount(0, $resources['data'][1]['relationships']['children-relationship']['data']);
+        $this->assertEquals(1, $resources['data'][2]['relationships']['parent-relationship']['data']['id']);
+        $this->assertCount(0, $resources['data'][2]['relationships']['children-relationship']['data']);
     }
 
     /**

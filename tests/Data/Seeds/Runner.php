@@ -21,6 +21,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Faker\Factory;
 use Limoncello\Tests\JsonApi\Data\Models\Board;
+use Limoncello\Tests\JsonApi\Data\Models\Category;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Models\CommentEmotion;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
@@ -110,6 +111,25 @@ class Runner
                 CommentEmotion::FIELD_ID_EMOTION => $faker->randomElement($allEmotions)[Emotion::FIELD_ID],
             ];
         });
+
+        $this->seedRows($connection, Category::TABLE_NAME, [
+            [Category::FIELD_NAME => 'Main', Category::FIELD_ID_PARENT => null],
+            [Category::FIELD_NAME => 'Sub1', Category::FIELD_ID_PARENT => 1],
+            [Category::FIELD_NAME => 'Sub2', Category::FIELD_ID_PARENT => 1],
+        ]);
+    }
+
+    /**
+     * @param Connection $connection
+     * @param string     $tableName
+     *
+     * @return array
+     */
+    protected function readAll(Connection $connection, $tableName)
+    {
+        $result = $connection->fetchAll("SELECT * FROM `$tableName`");
+
+        return $result;
     }
 
     /**
@@ -138,13 +158,41 @@ class Runner
     /**
      * @param Connection $connection
      * @param string     $tableName
+     * @param array      $fields
      *
-     * @return array
+     * @return void
      */
-    protected function readAll(Connection $connection, $tableName)
+    private function seedRow(Connection $connection, $tableName, array $fields)
     {
-        $result = $connection->fetchAll("SELECT * FROM `$tableName`");
+        $fields = array_merge($fields, [Model::FIELD_CREATED_AT => date('Y-m-d H:i:s')]);
 
-        return $result;
+        $quotedFields = [];
+        foreach ($fields as $column => $value) {
+            $quotedFields["`$column`"] = $value;
+        }
+
+        try {
+            $result = $connection->insert($tableName, $quotedFields);
+        } catch (UniqueConstraintViolationException $e) {
+            // ignore non-unique records
+            $result = true;
+        }
+        if ($result === false) {
+            assert('$result !== false', 'Statement execution failed');
+        }
+    }
+
+    /**
+     * @param Connection $connection
+     * @param string     $tableName
+     * @param array      $rows
+     *
+     * @return void
+     */
+    private function seedRows(Connection $connection, $tableName, array $rows)
+    {
+        foreach ($rows as $row) {
+            $this->seedRow($connection, $tableName, $row);
+        }
     }
 }

@@ -23,34 +23,28 @@ use Limoncello\Tests\JsonApi\Data\Types\SystemDateTimeType;
 /**
  * @package Limoncello\Tests\JsonApi
  */
-class Comment extends Model
+class Category extends Model
 {
     /** @inheritdoc */
-    const TABLE_NAME = 'comments';
+    const TABLE_NAME = 'categories';
 
     /** @inheritdoc */
-    const FIELD_ID = 'id_comment';
+    const FIELD_ID = 'id_category';
 
     /** Field name */
-    const FIELD_ID_POST = 'id_post_fk';
+    const FIELD_ID_PARENT = 'id_parent_fk';
+
+    /** Relationship name */
+    const REL_PARENT = 'parent';
+
+    /** Relationship name */
+    const REL_CHILDREN = 'children';
 
     /** Field name */
-    const FIELD_ID_USER = 'id_user_fk';
-
-    /** Relationship name */
-    const REL_POST = 'post';
-
-    /** Relationship name */
-    const REL_USER = 'user';
-
-    /** Relationship name */
-    const REL_EMOTIONS = 'emotions';
-
-    /** Field name */
-    const FIELD_TEXT = 'text';
+    const FIELD_NAME = 'name';
 
     /** Length constant */
-    const LENGTH_TEXT = 255;
+    const LENGTH_NAME = 255;
 
     /**
      * @inheritdoc
@@ -59,9 +53,8 @@ class Comment extends Model
     {
         return [
             self::FIELD_ID         => Type::INTEGER,
-            self::FIELD_ID_POST    => Type::INTEGER,
-            self::FIELD_ID_USER    => Type::INTEGER,
-            self::FIELD_TEXT       => Type::STRING,
+            self::FIELD_ID_PARENT  => Type::INTEGER,
+            self::FIELD_NAME       => Type::STRING,
             self::FIELD_CREATED_AT => SystemDateTimeType::NAME,
             self::FIELD_UPDATED_AT => SystemDateTimeType::NAME,
             self::FIELD_DELETED_AT => SystemDateTimeType::NAME,
@@ -74,7 +67,7 @@ class Comment extends Model
     public static function getAttributeLengths()
     {
         return [
-            self::FIELD_TEXT => self::LENGTH_TEXT,
+            self::FIELD_NAME => self::LENGTH_NAME,
         ];
     }
 
@@ -85,17 +78,7 @@ class Comment extends Model
     {
         return [
             RelationshipTypes::BELONGS_TO => [
-                self::REL_POST => [Post::class, self::FIELD_ID_POST, Post::REL_COMMENTS],
-                self::REL_USER => [User::class, self::FIELD_ID_USER, User::REL_COMMENTS],
-            ],
-            RelationshipTypes::BELONGS_TO_MANY => [
-                self::REL_EMOTIONS => [
-                    Emotion::class,
-                    CommentEmotion::TABLE_NAME,
-                    CommentEmotion::FIELD_ID_COMMENT,
-                    CommentEmotion::FIELD_ID_EMOTION,
-                    Emotion::REL_COMMENTS,
-                ],
+                self::REL_PARENT => [Category::class, self::FIELD_ID_PARENT, Category::REL_CHILDREN],
             ],
         ];
     }

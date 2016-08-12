@@ -568,8 +568,8 @@ class RepositoryTest extends TestCase
 
         $expected = 'SELECT `posts`.`id_post`, `posts`.`id_board_fk`, `posts`.`id_user_fk`, `posts`.`id_editor_fk`, ' .
             '`posts`.`title`, `posts`.`text`, `posts`.`created_at`, `posts`.`updated_at`, `posts`.`deleted_at` '.
-            'FROM posts INNER JOIN comments  ON `comments`.`id_post_fk`=`posts`.`id_post` ' .
-            "WHERE `comments`.`id_comment`=$indexBind";
+            'FROM posts INNER JOIN comments comments1 ON `posts`.`id_post`=`comments1`.`id_post_fk` ' .
+            "WHERE `comments1`.`id_comment`=$indexBind";
 
         $this->assertEquals($expected, $builder->getSQL());
     }
@@ -619,8 +619,9 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `emotions`.`id_emotion`, `emotions`.`name`, `emotions`.`created_at`, `emotions`.`updated_at` ' .
             'FROM emotions ' .
-            'INNER JOIN comments_emotions  ON `emotions`.`id_emotion`=`comments_emotions`.`id_emotion_fk` ' .
-            "WHERE `comments_emotions`.`id_comment_fk`=$indexBind";
+            'INNER JOIN comments_emotions comments_emotions1 ' .
+            'ON `emotions`.`id_emotion`=`comments_emotions1`.`id_emotion_fk` ' .
+            "WHERE `comments_emotions1`.`id_comment_fk`=$indexBind";
 
         $this->assertEquals($expected, $builder->getSQL());
     }
