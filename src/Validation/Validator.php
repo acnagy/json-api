@@ -27,7 +27,6 @@ use Limoncello\Validation\Captures\CaptureAggregator;
 use Limoncello\Validation\Contracts\CaptureAggregatorInterface;
 use Limoncello\Validation\Contracts\RuleInterface;
 use Limoncello\Validation\Contracts\TranslatorInterface as ValidationTranslatorInterface;
-use Limoncello\Validation\Errors\Error;
 use Limoncello\Validation\Errors\ErrorAggregator;
 use Limoncello\Validation\Validator\Captures;
 use Limoncello\Validation\Validator\Compares;
@@ -37,7 +36,6 @@ use Limoncello\Validation\Validator\Types;
 use Limoncello\Validation\Validator\ValidatorTrait;
 use Limoncello\Validation\Validator\Values;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
-use Neomerx\JsonApi\Exceptions\ErrorCollection;
 use Neomerx\JsonApi\Exceptions\JsonApiException;
 
 /**
@@ -122,12 +120,12 @@ class Validator implements ValidatorInterface
         array $toOneRules = [],
         array $toManyRules = []
     ) {
-        $errors = $this->createErrorCollection();
+        /** @var ErrorCollection $errors */
         /** @var CaptureAggregatorInterface $idAggregator */
         /** @var CaptureAggregatorInterface $attrTo1Aggregator */
         /** @var CaptureAggregatorInterface $toManyAggregator */
-        list ($idAggregator, $attrTo1Aggregator, $toManyAggregator) =
-            $this->check($errors, $schema, $jsonData, $idRule, $attributeRules, $toOneRules, $toManyRules);
+        list ($errors, $idAggregator, $attrTo1Aggregator, $toManyAggregator) =
+            $this->check($schema, $jsonData, $idRule, $attributeRules, $toOneRules, $toManyRules);
 
         if ($errors->count() > 0) {
             throw new JsonApiException($errors, $this->getErrorStatus());
@@ -140,7 +138,6 @@ class Validator implements ValidatorInterface
      * @inheritdoc
      */
     public function check(
-        ErrorCollection $errors,
         SchemaInterface $schema,
         array $jsonData,
         RuleInterface $idRule,
@@ -148,6 +145,7 @@ class Validator implements ValidatorInterface
         array $toOneRules = [],
         array $toManyRules = []
     ) {
+        $errors            = $this->createErrorCollection();
         $idAggregator      = $this->createCaptureAggregator();
         $attrTo1Aggregator = $this->createCaptureAggregator();
         $toManyAggregator  = $this->createCaptureAggregator();
@@ -159,7 +157,19 @@ class Validator implements ValidatorInterface
             ->createRelationshipCaptures($schema, $toOneRules, $attrTo1Aggregator, $toManyRules, $toManyAggregator);
         $this->validateCaptures($errors, $jsonData, $relationshipCaptures);
 
-        return [$idAggregator, $attrTo1Aggregator, $toManyAggregator];
+        return [$errors, $idAggregator, $attrTo1Aggregator, $toManyAggregator];
+    }
+
+    /**
+     * @return ErrorCollection
+     */
+    protected function createErrorCollection()
+    {
+        return new ErrorCollection(
+            $this->getJsonApiTranslator(),
+            $this->getValidationTranslator(),
+            $this->getErrorStatus()
+        );
     }
 
     /**
@@ -227,14 +237,6 @@ class Validator implements ValidatorInterface
     }
 
     /**
-     * @return ErrorCollection
-     */
-    protected function createErrorCollection()
-    {
-        return new ErrorCollection();
-    }
-
-    /**
      * @param ErrorCollection $errors
      * @param array           $jsonData
      * @param string          $expectedType
@@ -250,10 +252,7 @@ class Validator implements ValidatorInterface
             ], $ignoreOthers),
         ], $ignoreOthers);
         foreach ($this->validateRule($rule, $jsonData) as $error) {
-            /** @var Error $error */
-            $title  = $this->getJsonApiTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
-            $detail = $this->getValidationTranslator()->translate($error);
-            $errors->addDataTypeError($title, $detail, $this->getErrorStatus());
+            $errors->addValidationTypeError($error);
         }
     }
 
@@ -283,10 +282,7 @@ class Validator implements ValidatorInterface
             ], $ignoreOthers)
         ], $ignoreOthers);
         foreach ($this->validateRule($rule, $jsonData) as $error) {
-            /** @var Error $error */
-            $title  = $this->getJsonApiTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
-            $detail = $this->getValidationTranslator()->translate($error);
-            $errors->addDataIdError($title, $detail, $this->getErrorStatus());
+            $errors->addValidationIdError($error);
         }
     }
 
@@ -317,10 +313,7 @@ class Validator implements ValidatorInterface
         $dataErrors = $this
             ->validateRule(static::arrayX($attributeCaptures, $this->getUnlistedAttributeRule()), $attributes);
         foreach ($dataErrors as $error) {
-            /** @var Error $error */
-            $title  = $this->getJsonApiTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
-            $detail = $this->getValidationTranslator()->translate($error);
-            $errors->addDataAttributeError($error->getParameterName(), $title, $detail, $this->getErrorStatus());
+            $errors->addValidationAttributeError($error);
         }
     }
 
@@ -383,10 +376,7 @@ class Validator implements ValidatorInterface
             $relationships
         );
         foreach ($dataErrors as $error) {
-            /** @var Error $error */
-            $title  = $this->getJsonApiTranslator()->get(T::MSG_ERR_INVALID_ELEMENT);
-            $detail = $this->getValidationTranslator()->translate($error);
-            $errors->addRelationshipError($error->getParameterName(), $title, $detail, $this->getErrorStatus());
+            $errors->addValidationRelationshipError($error);
         }
     }
 

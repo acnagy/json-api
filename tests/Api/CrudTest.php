@@ -544,6 +544,19 @@ class CrudTest extends TestCase
     }
 
     /**
+     * Test read typed row.
+     */
+    public function testReadRow()
+    {
+        $crud = $this->createCrud(PostsApi::class);
+
+        $row = $crud->readRow(1);
+
+        $this->assertTrue(is_int($row[Post::FIELD_ID_BOARD]));
+        $this->assertTrue(is_string($row[Post::FIELD_TEXT]));
+    }
+
+    /**
      * @param string $class
      *
      * @return CrudInterface

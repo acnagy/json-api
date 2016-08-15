@@ -206,6 +206,20 @@ class Crud implements CrudInterface
     /**
      * @inheritdoc
      */
+    public function readRow($index)
+    {
+        $modelClass = $this->getModelClass();
+        $builder    = $this->getRepository()
+            ->read($modelClass, static::$indexBind)
+            ->setParameter(static::$indexBind, $index);
+        $typedRow   = $this->fetchRow($builder, $modelClass);
+
+        return $typedRow;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function delete($index)
     {
         $modelClass = $this->getModelClass();
@@ -375,6 +389,27 @@ class Crud implements CrudInterface
             ->setLimit($limit);
 
         return $data;
+    }
+
+    /**
+     * @param QueryBuilder $builder
+     * @param string       $class
+     *
+     * @return mixed|null
+     */
+    protected function fetchRow(QueryBuilder $builder, $class)
+    {
+        $statement = $builder->execute();
+        $statement->setFetchMode(PDOConnection::FETCH_ASSOC);
+        $platform = $builder->getConnection()->getDatabasePlatform();
+        $types    = $this->getModelSchemes()->getAttributeTypeInstances($class);
+
+        $model = null;
+        if (($attributes = $statement->fetch()) !== false) {
+            $model = $this->readRowFromAssoc($attributes, $types, $platform);
+        }
+
+        return $model;
     }
 
     /**
@@ -770,5 +805,27 @@ class Crud implements CrudInterface
         }
 
         return $instance;
+    }
+
+    /**
+     * @param array            $attributes
+     * @param Type[]           $types
+     * @param AbstractPlatform $platform
+     *
+     * @return mixed|null
+     */
+    private function readRowFromAssoc(array $attributes, array $types, AbstractPlatform $platform)
+    {
+        $row = [];
+        foreach ($attributes as $name => $value) {
+            if (array_key_exists($name, $types) === true) {
+                /** @var Type $type */
+                $type  = $types[$name];
+                $value = $type->convertToPHPValue($value, $platform);
+            }
+            $row[$name] = $value;
+        }
+
+        return $row;
     }
 }

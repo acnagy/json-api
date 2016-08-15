@@ -88,4 +88,11 @@ interface CrudInterface
         array $sortParams = null,
         array $pagingParams = null
     );
+
+    /**
+     * @param int|string $index
+     *
+     * @return array|null
+     */
+    public function readRow($index);
 }

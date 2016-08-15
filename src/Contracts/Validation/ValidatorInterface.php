@@ -17,9 +17,7 @@
  */
 
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
-use Limoncello\Validation\Contracts\CaptureAggregatorInterface;
 use Limoncello\Validation\Contracts\RuleInterface;
-use Neomerx\JsonApi\Exceptions\ErrorCollection;
 
 /**
  * @package Limoncello\JsonApi
@@ -55,7 +53,6 @@ interface ValidatorInterface
     );
 
     /**
-     * @param ErrorCollection $errors
      * @param SchemaInterface $schema
      * @param array           $jsonData
      * @param RuleInterface   $idRule
@@ -63,10 +60,9 @@ interface ValidatorInterface
      * @param RuleInterface[] $toOneRules
      * @param RuleInterface[] $toManyRules
      *
-     * @return CaptureAggregatorInterface
+     * @return array ErrorCollection and CaptureAggregatorInterface[]
      */
     public function check(
-        ErrorCollection $errors,
         SchemaInterface $schema,
         array $jsonData,
         RuleInterface $idRule,
