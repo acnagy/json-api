@@ -55,10 +55,10 @@ class DateTimeJsonApiNativeType extends DateTimeBaseType
      */
     public function convertToPHPValue($value, AbstractPlatform $platform)
     {
-        /** @var string|null $value */
+        /** @var string|null|DateTime $value */
 
-        if ($value === null) {
-            return null;
+        if ($value === null || $value instanceof DateTime) {
+            return $value;
         }
 
         $dateTime = DateTime::createFromFormat(static::JSON_API_FORMAT, $value);

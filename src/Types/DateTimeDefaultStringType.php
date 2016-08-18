@@ -63,9 +63,9 @@ class DateTimeDefaultStringType extends DateTimeBaseType
     }
 
     /**
-     * @param string $value
-     * @param string $fromFormat
-     * @param string $toFormat
+     * @param string|DateTime $value
+     * @param string          $fromFormat
+     * @param string          $toFormat
      *
      * @return string
      *
@@ -75,7 +75,7 @@ class DateTimeDefaultStringType extends DateTimeBaseType
      */
     private function convertDateTimeString($value, $fromFormat, $toFormat)
     {
-        $dateTime = DateTime::createFromFormat($fromFormat, $value);
+        $dateTime = $value instanceof DateTime ? $value : DateTime::createFromFormat($fromFormat, $value);
 
         if ($dateTime === false) {
             throw ConversionException::conversionFailedFormat($value, $this->getName(), $fromFormat);

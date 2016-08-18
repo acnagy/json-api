@@ -69,6 +69,8 @@ class DateTimeTypesTest extends TestCase
         $phpValue = $type->convertToPHPValue($dbDate, $platform);
         $this->assertEquals($dateTime, $phpValue);
 
+        $this->assertEquals($phpValue, $type->convertToPHPValue($phpValue, $platform));
+
         // extra coverage for getSQLDeclaration
         $this->assertEquals('DATETIME', $type->getSQLDeclaration([], $platform));
 
@@ -112,6 +114,7 @@ class DateTimeTypesTest extends TestCase
 
         $phpValue = $type->convertToPHPValue($jsonDate, $platform);
         $this->assertEquals($dateTime, $phpValue);
+        $this->assertEquals($phpValue, $type->convertToPHPValue($phpValue, $platform));
     }
 
     /**

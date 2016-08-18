@@ -45,13 +45,13 @@ class DateTimeJsonApiStringType extends DateTimeBaseType
      */
     public function convertToDatabaseValue($value, AbstractPlatform $platform)
     {
-        /** @var string|null $value */
+        /** @var string|null|DateTime $value */
 
         if ($value === null) {
             return null;
         }
 
-        $dateTime = DateTime::createFromFormat(static::JSON_API_FORMAT, $value);
+        $dateTime = $value instanceof DateTime ? $value : DateTime::createFromFormat(static::JSON_API_FORMAT, $value);
 
         if ($dateTime === false) {
             throw ConversionException::conversionFailedFormat($value, $this->getName(), static::JSON_API_FORMAT);
