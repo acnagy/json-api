@@ -23,7 +23,6 @@ use Limoncello\JsonApi\Contracts\Schema\JsonSchemesInterface;
 use Limoncello\JsonApi\Contracts\Schema\SchemaInterface;
 use Limoncello\JsonApi\Contracts\Validation\ValidatorInterface;
 use Limoncello\JsonApi\Http\JsonApiResponse;
-use Limoncello\Validation\Captures\CaptureAggregator;
 use Limoncello\Validation\Contracts\CaptureAggregatorInterface;
 use Limoncello\Validation\Contracts\RuleInterface;
 use Limoncello\Validation\Contracts\TranslatorInterface as ValidationTranslatorInterface;
@@ -35,6 +34,7 @@ use Limoncello\Validation\Validator\Generics;
 use Limoncello\Validation\Validator\Types;
 use Limoncello\Validation\Validator\ValidatorTrait;
 use Limoncello\Validation\Validator\Values;
+use Limoncello\Validation\Validator\Wrappers;
 use Neomerx\JsonApi\Contracts\Document\DocumentInterface;
 use Neomerx\JsonApi\Exceptions\JsonApiException;
 
@@ -43,9 +43,24 @@ use Neomerx\JsonApi\Exceptions\JsonApiException;
  *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-class Validator implements ValidatorInterface
+abstract class Validator implements ValidatorInterface
 {
-    use Captures, Compares, ExpressionsX, Generics, Types, Values, ValidatorTrait;
+    use Captures, Compares, ExpressionsX, Generics, Types, Values, Wrappers, ValidatorTrait;
+
+    /**
+     * @return CaptureAggregatorInterface
+     */
+    abstract protected function createIdCaptureAggregator();
+
+    /**
+     * @return CaptureAggregatorInterface
+     */
+    abstract protected function createAttributesAndToOneCaptureAggregator();
+
+    /**
+     * @return CaptureAggregatorInterface
+     */
+    abstract protected function createToManyCaptureAggregator();
 
     /**
      * @var T
@@ -146,9 +161,9 @@ class Validator implements ValidatorInterface
         array $toManyRules = []
     ) {
         $errors            = $this->createErrorCollection();
-        $idAggregator      = $this->createCaptureAggregator();
-        $attrTo1Aggregator = $this->createCaptureAggregator();
-        $toManyAggregator  = $this->createCaptureAggregator();
+        $idAggregator      = $this->createIdCaptureAggregator();
+        $attrTo1Aggregator = $this->createAttributesAndToOneCaptureAggregator();
+        $toManyAggregator  = $this->createToManyCaptureAggregator();
 
         $this->validateType($errors, $jsonData, $schema::TYPE);
         $this->validateId($errors, $schema, $jsonData, $idRule, $idAggregator);
@@ -229,14 +244,6 @@ class Validator implements ValidatorInterface
     }
 
     /**
-     * @return CaptureAggregatorInterface
-     */
-    protected function createCaptureAggregator()
-    {
-        return new CaptureAggregator();
-    }
-
-    /**
      * @param ErrorCollection $errors
      * @param array           $jsonData
      * @param string          $expectedType
@@ -248,7 +255,7 @@ class Validator implements ValidatorInterface
         $ignoreOthers = static::success();
         $rule         = static::arrayX([
             DocumentInterface::KEYWORD_DATA => static::arrayX([
-                DocumentInterface::KEYWORD_TYPE => static::andX(static::required(), static::equals($expectedType)),
+                DocumentInterface::KEYWORD_TYPE => static::required(static::equals($expectedType)),
             ], $ignoreOthers),
         ], $ignoreOthers);
         foreach ($this->validateRule($rule, $jsonData) as $error) {

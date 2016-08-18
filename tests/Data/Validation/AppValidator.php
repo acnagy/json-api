@@ -25,6 +25,7 @@ use Limoncello\Tests\JsonApi\Data\Models\Category;
 use Limoncello\Tests\JsonApi\Data\Models\Emotion;
 use Limoncello\Tests\JsonApi\Data\Models\Post;
 use Limoncello\Tests\JsonApi\Data\Models\Role;
+use Limoncello\Validation\Captures\CaptureAggregator;
 use Limoncello\Validation\Contracts\MessageCodes;
 use Limoncello\Validation\Contracts\RuleInterface;
 use Limoncello\Validation\Contracts\TranslatorInterface as ValidationTranslatorInterface;
@@ -93,7 +94,7 @@ class AppValidator extends Validator
      */
     public function requiredText($maxLength = null)
     {
-        return static::andX(static::required(), $this->optionalText($maxLength));
+        return static::required($this->optionalText($maxLength));
     }
 
     /**
@@ -113,7 +114,7 @@ class AppValidator extends Validator
      */
     public function requiredPostId($messageCode = MessageCodes::INVALID_VALUE)
     {
-        return static::andX(static::required(), $this->optionalPostId($messageCode));
+        return static::required($this->optionalPostId($messageCode));
     }
 
     /**
@@ -123,7 +124,7 @@ class AppValidator extends Validator
      */
     public function requiredRoleId($messageCode = MessageCodes::INVALID_VALUE)
     {
-        return static::andX(static::required(), $this->optionalRoleId($messageCode));
+        return static::required($this->optionalRoleId($messageCode));
     }
 
     /**
@@ -206,5 +207,29 @@ class AppValidator extends Validator
     protected function getConnection()
     {
         return $this->connection;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function createIdCaptureAggregator()
+    {
+        return new CaptureAggregator();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function createAttributesAndToOneCaptureAggregator()
+    {
+        return new CaptureAggregator();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    protected function createToManyCaptureAggregator()
+    {
+        return new CaptureAggregator();
     }
 }

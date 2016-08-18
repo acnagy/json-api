@@ -17,9 +17,9 @@
  */
 
 use Limoncello\JsonApi\I18n\Translator as JsonApiTranslator;
-use Limoncello\JsonApi\Validation\Validator;
 use Limoncello\Tests\JsonApi\Data\Models\Comment;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
+use Limoncello\Tests\JsonApi\Data\Validation\AppValidator;
 use Limoncello\Tests\JsonApi\TestCase;
 use Limoncello\Validation\I18n\Locales\EnUsLocale;
 use Limoncello\Validation\I18n\Translator;
@@ -37,11 +37,8 @@ class ValidatorTest extends TestCase
      */
     public function testCaptureValidData()
     {
-        $jsonApiTranslator    = new JsonApiTranslator();
-        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
-        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
-
-        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+        $jsonSchemes = $this->getJsonSchemes($this->getModelSchemes());
+        $validator   = $this->createValidator($jsonSchemes);
 
         $text  = 'Outside every fat man there was an even fatter man trying to close in';
         $jsonInput = <<<EOT
@@ -96,11 +93,8 @@ EOT;
      */
     public function testCaptureNullInTo1Relationship()
     {
-        $jsonApiTranslator    = new JsonApiTranslator();
-        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
-        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
-
-        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+        $jsonSchemes = $this->getJsonSchemes($this->getModelSchemes());
+        $validator   = $this->createValidator($jsonSchemes);
 
         $text  = 'Outside every fat man there was an even fatter man trying to close in';
         $jsonInput = <<<EOT
@@ -125,10 +119,7 @@ EOT;
             CommentSchema::ATTR_TEXT => v::andX(v::isString(), v::stringLength(1)),
         ];
         $toOneRules = [
-            CommentSchema::REL_USER => v::orX(
-                v::andX(v::isNumeric(), v::andX(v::moreThan(0), v::lessThan(15))),
-                v::isNull()
-            ),
+            CommentSchema::REL_USER => v::nullable(v::andX(v::isNumeric(), v::andX(v::moreThan(0), v::lessThan(15)))),
         ];
 
         $schema = $jsonSchemes->getSchemaByType(Comment::class);
@@ -145,11 +136,8 @@ EOT;
      */
     public function testCaptureInvalidData1()
     {
-        $jsonApiTranslator    = new JsonApiTranslator();
-        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
-        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
-
-        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+        $jsonSchemes = $this->getJsonSchemes($this->getModelSchemes());
+        $validator   = $this->createValidator($jsonSchemes);
 
         $text  = 'Outside every fat man there was an even fatter man trying to close in';
         $jsonInput = <<<EOT
@@ -234,17 +222,14 @@ EOT;
      */
     public function testCaptureInvalidData2()
     {
-        $jsonApiTranslator    = new JsonApiTranslator();
-        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
-        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
-
-        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+        $jsonSchemes = $this->getJsonSchemes($this->getModelSchemes());
+        $validator   = $this->createValidator($jsonSchemes);
 
         $input = json_decode('{}', true);
 
-        $idRule = v::andX(v::required(), v::isNull());
+        $idRule = v::required(v::isNull());
         $attributeRules = [
-            CommentSchema::ATTR_TEXT => v::andX(v::required(), v::andX(v::isString(), v::stringLength(1, 5))),
+            CommentSchema::ATTR_TEXT => v::required(v::andX(v::isString(), v::stringLength(1, 5))),
         ];
         $toOneRules = [
             CommentSchema::REL_USER => v::andX(v::isNumeric(), v::andX(v::moreThan(0), v::lessThan(2))),
@@ -287,11 +272,8 @@ EOT;
      */
     public function testCaptureInvalidData3()
     {
-        $jsonApiTranslator    = new JsonApiTranslator();
-        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
-        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
-
-        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+        $jsonSchemes = $this->getJsonSchemes($this->getModelSchemes());
+        $validator   = $this->createValidator($jsonSchemes);
 
         $jsonInput = <<<EOT
         {
@@ -356,11 +338,8 @@ EOT;
      */
     public function testCaptureInvalidData4()
     {
-        $jsonApiTranslator    = new JsonApiTranslator();
-        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
-        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
-
-        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+        $jsonSchemes = $this->getJsonSchemes($this->getModelSchemes());
+        $validator   = $this->createValidator($jsonSchemes);
 
         $jsonInput = <<<EOT
         {
@@ -421,17 +400,14 @@ EOT;
      */
     public function testCaptureInvalidData5()
     {
-        $jsonApiTranslator    = new JsonApiTranslator();
-        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
-        $jsonSchemes          = $this->getJsonSchemes($this->getModelSchemes());
-
-        $validator = new Validator($jsonApiTranslator, $validationTranslator, $jsonSchemes, $this->getModelSchemes());
+        $jsonSchemes = $this->getJsonSchemes($this->getModelSchemes());
+        $validator   = $this->createValidator($jsonSchemes);
 
         $input = json_decode('{}', true);
 
         $idRule = v::isNull();
         $attributeRules = [
-            CommentSchema::ATTR_TEXT => v::andX(v::required(), v::andX(v::isString(), v::stringLength(1, 5))),
+            CommentSchema::ATTR_TEXT => v::required(v::andX(v::isString(), v::stringLength(1, 5))),
         ];
         $toOneRules = [
             CommentSchema::REL_USER => v::andX(v::isNumeric(), v::andX(v::moreThan(0), v::lessThan(2))),
@@ -463,5 +439,26 @@ EOT;
         $this->assertEquals(422, $errors[1]->getStatus());
         $this->assertEquals('/data/attributes/text-attribute', $errors[1]->getSource()[Error::SOURCE_POINTER]);
         $this->assertEquals('The `text-attribute` value is required.', $errors[1]->getDetail());
+    }
+
+    /**
+     * @param $jsonSchemes
+     *
+     * @return AppValidator
+     */
+    private function createValidator($jsonSchemes)
+    {
+        $jsonApiTranslator    = new JsonApiTranslator();
+        $validationTranslator = new Translator(EnUsLocale::getLocaleCode(), EnUsLocale::getMessages());
+
+        $validator = new AppValidator(
+            $jsonApiTranslator,
+            $validationTranslator,
+            $jsonSchemes,
+            $this->getModelSchemes(),
+            $this->createConnection()
+        );
+
+        return $validator;
     }
 }
