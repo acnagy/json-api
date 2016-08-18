@@ -395,7 +395,7 @@ class Crud implements CrudInterface
      * @param QueryBuilder $builder
      * @param string       $class
      *
-     * @return mixed|null
+     * @return array|null
      */
     protected function fetchRow(QueryBuilder $builder, $class)
     {
@@ -812,7 +812,7 @@ class Crud implements CrudInterface
      * @param Type[]           $types
      * @param AbstractPlatform $platform
      *
-     * @return mixed|null
+     * @return array
      */
     private function readRowFromAssoc(array $attributes, array $types, AbstractPlatform $platform)
     {

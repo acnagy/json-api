@@ -16,6 +16,7 @@
  * limitations under the License.
  */
 
+use DateTime;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 
 /**
@@ -40,9 +41,9 @@ class DateTimeStringType extends DateTimeBaseType
      */
     public function convertToDatabaseValue($value, AbstractPlatform $platform)
     {
-        /** @var string|null $value */
+        /** @var string|null|DateTime $value */
 
-        return $value;
+        return $value instanceof DateTime ? $value->format($platform->getDateTimeFormatString()) : $value;
     }
 
     /** @noinspection PhpMissingParentCallCommonInspection
