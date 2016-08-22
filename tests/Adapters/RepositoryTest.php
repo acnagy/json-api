@@ -458,7 +458,7 @@ class RepositoryTest extends TestCase
         $this->assertNotNull($builder = $this->repository->create(Board::class, $attributes));
 
         /** @noinspection SqlDialectInspection */
-        $expected ='INSERT INTO boards (id_board, title) VALUES(:dcValue1, :dcValue2)';
+        $expected ='INSERT INTO `boards` (`id_board`, `title`) VALUES(:dcValue1, :dcValue2)';
 
         $this->assertEquals($expected, $builder->getSQL());
         $this->assertEquals([
@@ -482,7 +482,7 @@ class RepositoryTest extends TestCase
 
         /** @noinspection SqlDialectInspection */
         $expected =
-            'UPDATE boards SET title = :dcValue1, updated_at = :dcValue2, deleted_at = :dcValue3 ' .
+            'UPDATE `boards` SET `title` = :dcValue1, `updated_at` = :dcValue2, `deleted_at` = :dcValue3 ' .
             'WHERE `boards`.`id_board`=:dcValue4';
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -525,7 +525,9 @@ class RepositoryTest extends TestCase
         ));
 
         /** @noinspection SqlDialectInspection */
-        $expected = "INSERT INTO comments_emotions (id_comment_fk, id_emotion_fk) VALUES($indexBind, $otherIndexBind)";
+        $expected =
+            "INSERT INTO `comments_emotions` (`id_comment_fk`, `id_emotion_fk`) " .
+            "VALUES($indexBind, $otherIndexBind)";
 
         $this->assertEquals($expected, $builder->getSQL());
     }
@@ -544,7 +546,7 @@ class RepositoryTest extends TestCase
         ));
 
         /** @noinspection SqlDialectInspection */
-        $expected = "DELETE FROM comments_emotions WHERE `comments_emotions`.`id_comment_fk`=$indexBind";
+        $expected = "DELETE FROM `comments_emotions` WHERE `comments_emotions`.`id_comment_fk`=$indexBind";
 
         $this->assertEquals($expected, $builder->getSQL());
     }

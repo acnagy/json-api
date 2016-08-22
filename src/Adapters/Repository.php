@@ -124,11 +124,12 @@ class Repository implements RepositoryInterface
         foreach ($attributes as $column => $value) {
             $type     = Type::getType($types[$column]);
             $pdoValue = $type->convertToDatabaseValue($value, $dbPlatform);
-            $valuesAsParams[$column] = $builder->createNamedParameter($pdoValue, $type->getBindingType());
+            $valuesAsParams["`$column`"] = $builder->createNamedParameter($pdoValue, $type->getBindingType());
         }
 
+        $tableName = $this->getTableName($modelClass);
         $builder
-            ->insert($this->getTableName($modelClass))
+            ->insert("`$tableName`")
             ->values($valuesAsParams);
 
         return $builder;
@@ -171,12 +172,12 @@ class Repository implements RepositoryInterface
         $types      = $this->getModelSchemes()->getAttributeTypes($modelClass);
 
         $table = $this->getTableName($modelClass);
-        $builder->update($table);
+        $builder->update("`$table`");
 
         foreach ($attributes as $column => $value) {
             $type     = Type::getType($types[$column]);
             $pdoValue = $type->convertToDatabaseValue($value, $dbPlatform);
-            $builder->set($column, $builder->createNamedParameter($pdoValue, $type->getBindingType()));
+            $builder->set("`$column`", $builder->createNamedParameter($pdoValue, $type->getBindingType()));
         }
 
         $pkName   = $this->getPrimaryKeyName($modelClass);
@@ -212,10 +213,10 @@ class Repository implements RepositoryInterface
 
         $builder = $this->getConnection()->createQueryBuilder();
         $builder
-            ->insert($intermediateTable)
+            ->insert("`$intermediateTable`")
             ->values([
-                $foreignKey        => $indexBind,
-                $reverseForeignKey => $otherIndexBind,
+                "`$foreignKey`"        => $indexBind,
+                "`$reverseForeignKey`" => $otherIndexBind,
             ]);
 
         return $builder;
@@ -231,7 +232,7 @@ class Repository implements RepositoryInterface
 
         $builder = $this->getConnection()->createQueryBuilder();
         $builder
-            ->delete($intermediateTable);
+            ->delete("`$intermediateTable`");
         $this->addWhereBind($builder, $intermediateTable, $foreignKey, $indexBind);
 
         return $builder;
