@@ -21,31 +21,43 @@ use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Types\ConversionException;
 
 /**
- * Receives string value from database in default database format and converts it to string in JSON API format.
+ * Receives string value from database in JSON API format and just passes it further.
  * Converts JSON API string to string in default database format.
  *
- * string (default database format) -> string (JSON API format) (read)
+ * string (JSON API format) -> string (JSON API format) (read)
  * string (JSON API format) -> string (default database format) (create / update)
+ *
+ * The main benefit of this type is that it does not involve any DateTime parsing
+ * on reading which is good for performance. Though database must format output
+ * dates in JSON API format.
  *
  * @package Limoncello\JsonApi
  */
-class DateTimeDefaultStringType extends DateTimeBaseType
+class DateJsonApiStringType extends DateBaseType
 {
     /** Type name */
-    const NAME = 'jaDefaultStringDateTime';
+    const NAME = 'jaJsonApiStringDate';
 
     /** @noinspection PhpMissingParentCallCommonInspection
      * @inheritdoc
+     *
+     * @SuppressWarnings(PHPMD.StaticAccess)
      */
     public function convertToDatabaseValue($value, AbstractPlatform $platform)
     {
-        /** @var string|null $value */
+        /** @var string|null|DateTime $value */
 
         if ($value === null) {
             return null;
         }
 
-        return $this->convertDateTimeString($value, static::JSON_API_FORMAT, $platform->getDateTimeFormatString());
+        $dateTime = $value instanceof DateTime ? $value : DateTime::createFromFormat(static::JSON_API_FORMAT, $value);
+
+        if ($dateTime === false) {
+            throw ConversionException::conversionFailedFormat($value, $this->getName(), static::JSON_API_FORMAT);
+        }
+
+        return $dateTime->format($platform->getDateFormatString());
     }
 
     /** @noinspection PhpMissingParentCallCommonInspection
@@ -55,34 +67,6 @@ class DateTimeDefaultStringType extends DateTimeBaseType
     {
         /** @var string|null $value */
 
-        if ($value === null) {
-            return null;
-        }
-
-        return $this->convertDateTimeString($value, $platform->getDateTimeFormatString(), static::JSON_API_FORMAT);
-    }
-
-    /**
-     * @param string|DateTime $value
-     * @param string          $fromFormat
-     * @param string          $toFormat
-     *
-     * @return string
-     *
-     * @throws ConversionException
-     *
-     * @SuppressWarnings(PHPMD.StaticAccess)
-     */
-    private function convertDateTimeString($value, $fromFormat, $toFormat)
-    {
-        $dateTime = $value instanceof DateTime ? $value : DateTime::createFromFormat($fromFormat, $value);
-
-        if ($dateTime === false) {
-            throw ConversionException::conversionFailedFormat($value, $this->getName(), $fromFormat);
-        }
-
-        $result = $dateTime->format($toFormat);
-
-        return $result;
+        return $value;
     }
 }

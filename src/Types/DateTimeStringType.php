@@ -34,7 +34,7 @@ use Doctrine\DBAL\Platforms\AbstractPlatform;
 class DateTimeStringType extends DateTimeBaseType
 {
     /** Type name */
-    const NAME = 'jsonApiStringDateTime';
+    const NAME = 'jaStringDateTime';
 
     /** @noinspection PhpMissingParentCallCommonInspection
      * @inheritdoc

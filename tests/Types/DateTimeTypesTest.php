@@ -18,6 +18,7 @@
 
 use DateTime;
 use Doctrine\DBAL\Types\Type;
+use Limoncello\JsonApi\Types\DateJsonApiStringType;
 use Limoncello\JsonApi\Types\DateTimeDefaultNativeType;
 use Limoncello\JsonApi\Types\DateTimeDefaultStringType;
 use Limoncello\JsonApi\Types\DateTimeJsonApiNativeType;
@@ -48,6 +49,9 @@ class DateTimeTypesTest extends TestCase
         }
         if (Type::hasType(DateTimeJsonApiStringType::NAME) === false) {
             Type::addType(DateTimeJsonApiStringType::NAME, DateTimeJsonApiStringType::class);
+        }
+        if (Type::hasType(DateJsonApiStringType::NAME) === false) {
+            Type::addType(DateJsonApiStringType::NAME, DateJsonApiStringType::class);
         }
     }
 
@@ -146,5 +150,39 @@ class DateTimeTypesTest extends TestCase
         $platform = $this->createConnection()->getDatabasePlatform();
 
         $type->convertToPHPValue('2001-02-03 04:05:06.XXX', $platform);
+    }
+
+    /**
+     * Test date conversions.
+     */
+    public function testJsonApiStringDateConversions()
+    {
+        $type     = Type::getType(DateJsonApiStringType::NAME);
+        $platform = $this->createConnection()->getDatabasePlatform();
+
+        $jsonDate = '2001-02-03T04:05:06+0000';
+        $dbDate   = '2001-02-03';
+
+        $dbValue = $type->convertToDatabaseValue($jsonDate, $platform);
+        $this->assertEquals($dbDate, $dbValue);
+
+        $dbValue = $type->convertToDatabaseValue(null, $platform);
+        $this->assertNull($dbValue);
+
+        $phpValue = $type->convertToPHPValue($jsonDate, $platform);
+        $this->assertEquals($jsonDate, $phpValue);
+    }
+
+    /**
+     * Test date conversions.
+     *
+     * @expectedException \Doctrine\DBAL\Types\ConversionException
+     */
+    public function testInvalidValueForJsonApiStringDateConversions()
+    {
+        $type     = Type::getType(DateJsonApiStringType::NAME);
+        $platform = $this->createConnection()->getDatabasePlatform();
+
+        $type->convertToDatabaseValue('2001-02-03 04:05:06.XXX', $platform);
     }
 }

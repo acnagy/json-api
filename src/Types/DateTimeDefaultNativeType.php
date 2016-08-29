@@ -31,7 +31,7 @@ use Doctrine\DBAL\Types\ConversionException;
 class DateTimeDefaultNativeType extends DateTimeBaseType
 {
     /** Type name */
-    const NAME = 'jsonApiDefaultNativeDateTime';
+    const NAME = 'jaDefaultNativeDateTime';
 
     /** @noinspection PhpMissingParentCallCommonInspection
      * @inheritdoc
