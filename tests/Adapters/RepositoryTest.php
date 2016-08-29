@@ -34,6 +34,7 @@ use Limoncello\Tests\JsonApi\Data\Models\Post;
 use Limoncello\Tests\JsonApi\Data\Schemes\BoardSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\CommentSchema;
 use Limoncello\Tests\JsonApi\Data\Schemes\EmotionSchema;
+use Limoncello\Tests\JsonApi\Data\Schemes\PostSchema;
 use Limoncello\Tests\JsonApi\TestCase;
 use Neomerx\JsonApi\Encoder\Parameters\SortParameter as JsonLibrarySortParameter;
 use Neomerx\JsonApi\Exceptions\ErrorCollection;
@@ -337,6 +338,95 @@ class RepositoryTest extends TestCase
             'dcValue2'  => '3',
             'dcValue3'  => '2',
         ], $builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testIndexFilterNotNullOnBelongsToRelationship()
+    {
+        $value        = ['not-null' => null];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(PostSchema::REL_BOARD, Post::REL_BOARD, $value, true, RelationshipTypes::BELONGS_TO)
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Post::class));
+        $this->repository->applyFilters($errors, $builder, Post::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `posts`.`id_post`, `posts`.`id_board_fk`, `posts`.`id_user_fk`, `posts`.`id_editor_fk`, '.
+            '`posts`.`title`, `posts`.`text`, `posts`.`created_at`, `posts`.`updated_at`, `posts`.`deleted_at` '.
+            'FROM posts '.
+            'WHERE `posts`.`id_board_fk` IS NOT NULL';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEquals([], $builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testIndexFilterNotNullOnHasManyRelationship()
+    {
+        $value        = ['not-null' => null];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(BoardSchema::REL_POSTS, Board::REL_POSTS, $value, true, RelationshipTypes::HAS_MANY)
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Board::class));
+        $this->repository->applyFilters($errors, $builder, Board::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
+            '`boards`.`updated_at`, `boards`.`deleted_at` ' .
+            'FROM boards ' .
+            'INNER JOIN posts posts1 ON `boards`.`id_board`=`posts1`.`id_board_fk` ' .
+            'WHERE `posts1`.`id_post` IS NOT NULL ' .
+            'GROUP BY `boards`.`id_board`';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEquals([], $builder->getParameters());
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testIndexFilterNotNullOnBelongsToManyRelationship()
+    {
+        $value        = ['not-null' => null];
+        $filterParams = new FilterParameterCollection();
+        $filterParams->add(
+            new FilterParameter(
+                CommentSchema::REL_EMOTIONS,
+                Comment::REL_EMOTIONS,
+                $value,
+                true,
+                RelationshipTypes::BELONGS_TO_MANY
+            )
+        );
+
+        $errors = new ErrorCollection();
+        $this->assertNotNull($builder = $this->repository->index(Comment::class));
+        $this->repository->applyFilters($errors, $builder, Comment::class, $filterParams);
+        $this->assertEmpty($errors);
+
+        $expected =
+            'SELECT `comments`.`id_comment`, `comments`.`id_post_fk`, `comments`.`id_user_fk`, `comments`.`text`, '.
+                '`comments`.`created_at`, `comments`.`updated_at`, `comments`.`deleted_at` '.
+            'FROM comments '.
+            'INNER JOIN comments_emotions comments_emotions1 ON '.
+                '`comments`.`id_comment`=`comments_emotions1`.`id_comment_fk` '.
+            'WHERE `comments_emotions1`.`id_emotion_fk` IS NOT NULL '.
+            'GROUP BY `comments`.`id_comment`';
+
+        $this->assertEquals($expected, $builder->getSQL());
+        $this->assertEquals([], $builder->getParameters());
     }
 
     /**
