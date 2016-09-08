@@ -291,7 +291,7 @@ class Crud implements CrudInterface
                 $saveToMany = $this->builderSaveRelationshipOnUpdate($name, $saveToMany);
                 $saveToMany->setParameter($indexBind, $index);
                 foreach ($values as $value) {
-                    $saveToMany->setParameter($otherIndexBind, $value)->execute();
+                    $updated += (int)$saveToMany->setParameter($otherIndexBind, $value)->execute();
                 }
             }
         });

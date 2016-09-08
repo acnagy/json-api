@@ -190,7 +190,8 @@ class CrudTest extends TestCase
 
         $crud = $this->createCrud(CommentsApi::class);
 
-        $crud->update($commentId, $attributes, $toMany);
+        $changedRecords = $crud->update($commentId, $attributes, $toMany);
+        $this->assertEquals(3, $changedRecords);
         $this->assertNotNull($data = $crud->read($commentId)->getPaginatedData());
         $this->assertNotNull($model = $data->getData());
 
