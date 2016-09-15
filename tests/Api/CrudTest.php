@@ -558,6 +558,27 @@ class CrudTest extends TestCase
     }
 
     /**
+     * Test index.
+     */
+    public function testCount()
+    {
+        $crud = $this->createCrud(PostsApi::class);
+
+        $filteringParameters = new FilterParameterCollection();
+        $filteringParameters->add(
+            new FilterParameter(PostSchema::ATTR_TITLE, Post::FIELD_TITLE, ['like' => ['%', '%']], false, null)
+        );
+        $relationshipType = RelationshipTypes::BELONGS_TO;
+        $filteringParameters->add(
+            new FilterParameter(PostSchema::REL_USER, Post::REL_USER, ['lt' => '5'], true, $relationshipType)
+        );
+
+        $result = $crud->count($filteringParameters);
+
+        $this->assertEquals(14, $result);
+    }
+
+    /**
      * @param string $class
      *
      * @return CrudInterface

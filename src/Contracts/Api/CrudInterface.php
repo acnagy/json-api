@@ -95,4 +95,11 @@ interface CrudInterface
      * @return array|null
      */
     public function readRow($index);
+
+    /**
+     * @param FilterParameterCollection|null $filterParams
+     *
+     * @return int|null
+     */
+    public function count(FilterParameterCollection $filterParams = null);
 }

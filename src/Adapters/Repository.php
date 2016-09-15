@@ -103,7 +103,20 @@ class Repository implements RepositoryInterface
     public function index($modelClass)
     {
         $builder = $this->getConnection()->createQueryBuilder();
-        $builder->select($this->getColumns($modelClass))->from($this->getTableName($modelClass));
+        $table   = $this->buildTableName($this->getTableName($modelClass));
+        $builder->select($this->getColumns($modelClass))->from($table);
+
+        return $builder;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    public function count($modelClass)
+    {
+        $builder = $this->getConnection()->createQueryBuilder();
+        $table   = $this->buildTableName($this->getTableName($modelClass));
+        $builder->select('COUNT(*)')->from($table);
 
         return $builder;
     }
@@ -142,7 +155,7 @@ class Repository implements RepositoryInterface
     {
         $builder = $this->getConnection()->createQueryBuilder();
         $table   = $this->getTableName($modelClass);
-        $builder->select($this->getColumns($modelClass))->from($table);
+        $builder->select($this->getColumns($modelClass))->from($this->buildTableName($table));
         $this->addWhereBind($builder, $table, $this->getPrimaryKeyName($modelClass), $indexBind);
 
         return $builder;
@@ -181,7 +194,7 @@ class Repository implements RepositoryInterface
         }
 
         $pkName   = $this->getPrimaryKeyName($modelClass);
-        $pkColumn = $this->buildTableColumn($table, $pkName);
+        $pkColumn = $this->buildTableColumnName($table, $pkName);
         $type     = Type::getType($types[$pkName]);
         $pdoValue = $type->convertToDatabaseValue($index, $dbPlatform);
         $builder->where($pkColumn . '=' . $builder->createNamedParameter($pdoValue, $type->getBindingType()));
@@ -197,7 +210,7 @@ class Repository implements RepositoryInterface
         $builder = $this->getConnection()->createQueryBuilder();
 
         $table = $this->getTableName($modelClass);
-        $builder->delete($table);
+        $builder->delete($this->buildTableName($table));
         $this->addWhereBind($builder, $table, $this->getPrimaryKeyName($modelClass), $indexBind);
 
         return $builder;
@@ -255,7 +268,7 @@ class Repository implements RepositoryInterface
 
             if ($column !== null) {
                 $builder->addOrderBy(
-                    $this->buildTableColumn($table, $column),
+                    $this->buildTableColumnName($table, $column),
                     $sortParam->isAscending() === true ? 'ASC' : 'DESC'
                 );
             }
@@ -285,6 +298,7 @@ class Repository implements RepositoryInterface
         // while joining tables we select distinct rows. this flag used to apply `distinct` no more than once.
         $hasAppliedDistinct = false;
         $table              = $this->getTableName($modelClass);
+        $quotedTable        = $this->buildTableName($table);
         $modelSchemes       = $this->getModelSchemes();
         foreach ($filterParams as $filterParam) {
             /** @var FilterParameterInterface $filterParam */
@@ -327,9 +341,14 @@ class Repository implements RepositoryInterface
                             $reverseFk     = $modelSchemes->getForeignKey($reverseClass, $reverseName);
                             $filterColumn  = $modelSchemes->getPrimaryKey($reverseClass);
                             $aliased       = $filterTable . $this->getNewAliasId();
-                            $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
-                                $this->buildTableColumn($aliased, $reverseFk);
-                            $builder->innerJoin($table, $filterTable, $aliased, $joinCondition);
+                            $joinCondition = $this->buildTableColumnName($table, $primaryKey) . '=' .
+                                $this->buildTableColumnName($aliased, $reverseFk);
+                            $builder->innerJoin(
+                                $quotedTable,
+                                $this->buildTableName($filterTable),
+                                $aliased,
+                                $joinCondition
+                            );
                             if ($hasAppliedDistinct === false) {
                                 $this->distinct($builder, $modelClass);
                                 $hasAppliedDistinct = true;
@@ -342,9 +361,14 @@ class Repository implements RepositoryInterface
                                 ->getBelongsToManyRelationship($modelClass, $filterParam->getName());
                             $primaryKey    = $modelSchemes->getPrimaryKey($modelClass);
                             $aliased       = $filterTable . $this->getNewAliasId();
-                            $joinCondition = $this->buildTableColumn($table, $primaryKey) . '=' .
-                                $this->buildTableColumn($aliased, $reversePk);
-                            $builder->innerJoin($table, $filterTable, $aliased, $joinCondition);
+                            $joinCondition = $this->buildTableColumnName($table, $primaryKey) . '=' .
+                                $this->buildTableColumnName($aliased, $reversePk);
+                            $builder->innerJoin(
+                                $quotedTable,
+                                $this->buildTableName($filterTable),
+                                $aliased,
+                                $joinCondition
+                            );
                             if ($hasAppliedDistinct === false) {
                                 $this->distinct($builder, $modelClass);
                                 $hasAppliedDistinct = true;
@@ -609,7 +633,7 @@ class Repository implements RepositoryInterface
     private function addWhereBind(QueryBuilder $builder, $table, $column, $bindName)
     {
         $builder
-            ->andWhere($this->buildTableColumn($table, $column) . '=' . $bindName);
+            ->andWhere($this->buildTableColumnName($table, $column) . '=' . $bindName);
     }
 
     /**
@@ -618,9 +642,19 @@ class Repository implements RepositoryInterface
      *
      * @return string
      */
-    private function buildTableColumn($table, $column)
+    private function buildTableColumnName($table, $column)
     {
         return "`$table`.`$column`";
+    }
+
+    /**
+     * @param string $table
+     *
+     * @return string
+     */
+    private function buildTableName($table)
+    {
+        return "`$table`";
     }
 
     /**
@@ -631,21 +665,22 @@ class Repository implements RepositoryInterface
      */
     private function createBelongsToBuilder($modelClass, $relationshipName)
     {
-        $oneClass      = $this->getModelSchemes()->getReverseModelClass($modelClass, $relationshipName);
-        $oneTable      = $this->getTableName($oneClass);
-        $onePrimaryKey = $this->getPrimaryKeyName($oneClass);
-        $table         = $this->getTableName($modelClass);
-        $foreignKey    = $this->getModelSchemes()->getForeignKey($modelClass, $relationshipName);
+        $oneClass       = $this->getModelSchemes()->getReverseModelClass($modelClass, $relationshipName);
+        $oneTable       = $this->getTableName($oneClass);
+        $oneTableQuoted = $this->buildTableName($oneTable);
+        $onePrimaryKey  = $this->getPrimaryKeyName($oneClass);
+        $table          = $this->getTableName($modelClass);
+        $foreignKey     = $this->getModelSchemes()->getForeignKey($modelClass, $relationshipName);
 
         $builder = $this->getConnection()->createQueryBuilder();
 
         $aliased       = $table . $this->getNewAliasId();
-        $joinCondition = $this->buildTableColumn($oneTable, $onePrimaryKey) . '=' .
-            $this->buildTableColumn($aliased, $foreignKey);
+        $joinCondition = $this->buildTableColumnName($oneTable, $onePrimaryKey) . '=' .
+            $this->buildTableColumnName($aliased, $foreignKey);
         $builder
             ->select($this->getColumns($oneClass))
-            ->from($oneTable)
-            ->innerJoin($oneTable, $table, $aliased, $joinCondition);
+            ->from($oneTableQuoted)
+            ->innerJoin($oneTableQuoted, $table, $aliased, $joinCondition);
 
         return [$builder, $oneClass, $aliased, $this->getPrimaryKeyName($modelClass)];
     }
@@ -665,7 +700,7 @@ class Repository implements RepositoryInterface
         $builder      = $this->getConnection()->createQueryBuilder();
         $builder
             ->select($this->getColumns($reverseClass))
-            ->from($reverseTable);
+            ->from($this->buildTableName($reverseTable));
 
         return [$builder, $reverseClass, $reverseTable, $foreignKey];
     }
@@ -680,18 +715,19 @@ class Repository implements RepositoryInterface
     {
         list ($intermediateTable, $foreignKey, $reverseForeignKey) =
             $this->getModelSchemes()->getBelongsToManyRelationship($modelClass, $relationshipName);
-        $reverseClass = $this->getModelSchemes()->getReverseModelClass($modelClass, $relationshipName);
-        $reverseTable = $this->getModelSchemes()->getTable($reverseClass);
-        $reversePk    = $this->getModelSchemes()->getPrimaryKey($reverseClass);
+        $reverseClass       = $this->getModelSchemes()->getReverseModelClass($modelClass, $relationshipName);
+        $reverseTable       = $this->getModelSchemes()->getTable($reverseClass);
+        $reverseTableQuoted = $this->buildTableName($reverseTable);
+        $reversePk          = $this->getModelSchemes()->getPrimaryKey($reverseClass);
 
         $aliased       = $intermediateTable . $this->getNewAliasId();
-        $joinCondition = $this->buildTableColumn($reverseTable, $reversePk) . '=' .
-            $this->buildTableColumn($aliased, $reverseForeignKey);
+        $joinCondition = $this->buildTableColumnName($reverseTable, $reversePk) . '=' .
+            $this->buildTableColumnName($aliased, $reverseForeignKey);
         $builder       = $this->getConnection()->createQueryBuilder();
         $builder
             ->select($this->getColumns($reverseClass))
-            ->from($reverseTable)
-            ->innerJoin($reverseTable, $intermediateTable, $aliased, $joinCondition);
+            ->from($reverseTableQuoted)
+            ->innerJoin($reverseTableQuoted, $intermediateTable, $aliased, $joinCondition);
 
         return [$builder, $reverseClass, $aliased, $foreignKey];
     }

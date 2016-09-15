@@ -139,6 +139,24 @@ class Crud implements CrudInterface
     /**
      * @inheritdoc
      */
+    public function count(FilterParameterCollection $filterParams = null)
+    {
+        $modelClass = $this->getModelClass();
+
+        $builder = $this->getRepository()->count($modelClass);
+
+        $errors = $this->getFactory()->createErrorCollection();
+        $filterParams === null ?: $this->getRepository()->applyFilters($errors, $builder, $modelClass, $filterParams);
+        $this->checkErrors($errors);
+
+        $result = $this->builderOnCount($builder)->execute()->fetchColumn();
+
+        return $result === false ? null : $result;
+    }
+
+    /**
+     * @inheritdoc
+     */
     public function read($index, FilterParameterCollection $filterParams = null, array $includePaths = null)
     {
         $modelClass = $this->getModelClass();
@@ -482,6 +500,16 @@ class Crud implements CrudInterface
         $allowedChanges    = array_intersect_key($attributes, $allowedAttributes);
 
         return $allowedChanges;
+    }
+
+    /**
+     * @param QueryBuilder $builder
+     *
+     * @return QueryBuilder
+     */
+    protected function builderOnCount(QueryBuilder $builder)
+    {
+        return $builder;
     }
 
     /**

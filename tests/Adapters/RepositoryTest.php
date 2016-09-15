@@ -83,7 +83,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards WHERE `boards`.`id_board`=' . $indexBind;
+            'FROM `boards` WHERE `boards`.`id_board`=' . $indexBind;
 
         $this->assertEquals($expected, $builder->getSQL());
     }
@@ -98,7 +98,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards';
+            'FROM `boards`';
 
         $this->assertEquals($expected, $builder->getSQL());
     }
@@ -118,7 +118,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards';
+            'FROM `boards`';
 
         $this->assertEquals($expected, $builder->getSQL());
         $this->assertEmpty($builder->getParameters());
@@ -156,7 +156,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
+            'FROM `boards` ' .
             'WHERE ' .
             '(`boards`.`title` = :dcValue1) AND ' .
             '(`boards`.`title` <> :dcValue2) AND (`boards`.`title` <> :dcValue3) AND ' .
@@ -211,7 +211,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
+            'FROM `boards` ' .
             'WHERE (`boards`.`title` >= :dcValue1) OR (`boards`.`title` <= :dcValue2)';
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -240,7 +240,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
+            'FROM `boards` ' .
             'WHERE ' .
             '`boards`.`title` IN (:dcValue1, :dcValue2, :dcValue3)';
 
@@ -271,7 +271,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
+            'FROM `boards` ' .
             'WHERE ' .
             '`boards`.`title` = :dcValue1';
 
@@ -300,7 +300,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
+            'FROM `boards` ' .
             'WHERE ' .
             '`boards`.`title` IS NULL';
 
@@ -327,8 +327,8 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
-            'INNER JOIN posts posts1 ON `boards`.`id_board`=`posts1`.`id_board_fk` ' .
+            'FROM `boards` ' .
+            'INNER JOIN `posts` posts1 ON `boards`.`id_board`=`posts1`.`id_board_fk` ' .
             'WHERE `posts1`.`id_post` IN (:dcValue1, :dcValue2, :dcValue3) ' .
             'GROUP BY `boards`.`id_board`';
 
@@ -359,7 +359,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `posts`.`id_post`, `posts`.`id_board_fk`, `posts`.`id_user_fk`, `posts`.`id_editor_fk`, '.
             '`posts`.`title`, `posts`.`text`, `posts`.`created_at`, `posts`.`updated_at`, `posts`.`deleted_at` '.
-            'FROM posts '.
+            'FROM `posts` '.
             'WHERE `posts`.`id_board_fk` IS NOT NULL';
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -385,8 +385,8 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
-            'INNER JOIN posts posts1 ON `boards`.`id_board`=`posts1`.`id_board_fk` ' .
+            'FROM `boards` ' .
+            'INNER JOIN `posts` posts1 ON `boards`.`id_board`=`posts1`.`id_board_fk` ' .
             'WHERE `posts1`.`id_post` IS NOT NULL ' .
             'GROUP BY `boards`.`id_board`';
 
@@ -419,8 +419,8 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `comments`.`id_comment`, `comments`.`id_post_fk`, `comments`.`id_user_fk`, `comments`.`text`, '.
                 '`comments`.`created_at`, `comments`.`updated_at`, `comments`.`deleted_at` '.
-            'FROM comments '.
-            'INNER JOIN comments_emotions comments_emotions1 ON '.
+            'FROM `comments` '.
+            'INNER JOIN `comments_emotions` comments_emotions1 ON '.
                 '`comments`.`id_comment`=`comments_emotions1`.`id_comment_fk` '.
             'WHERE `comments_emotions1`.`id_emotion_fk` IS NOT NULL '.
             'GROUP BY `comments`.`id_comment`';
@@ -446,7 +446,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
+            'FROM `boards` ' .
             'ORDER BY `boards`.`title` ASC, `boards`.`id_board` DESC, `boards`.`created_at` DESC';
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -471,7 +471,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `comments`.`id_comment`, `comments`.`id_post_fk`, `comments`.`id_user_fk`, ' .
                 '`comments`.`text`, `comments`.`created_at`, `comments`.`updated_at`, `comments`.`deleted_at` ' .
-            'FROM comments ' .
+            'FROM `comments` ' .
             'ORDER BY `comments`.`id_user_fk` DESC';
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -504,7 +504,7 @@ class RepositoryTest extends TestCase
         $expected =
             'SELECT `boards`.`id_board`, `boards`.`title`, `boards`.`created_at`, '.
             '`boards`.`updated_at`, `boards`.`deleted_at` ' .
-            'FROM boards ' .
+            'FROM `boards` ' .
             'WHERE `boards`.`title` = :dcValue1 ' .
             'ORDER BY `boards`.`title` ASC, `boards`.`id_board` DESC';
 
@@ -594,7 +594,7 @@ class RepositoryTest extends TestCase
         $this->assertNotNull($builder = $this->repository->delete(Board::class, $indexBind));
 
         /** @noinspection SqlDialectInspection */
-        $expected ='DELETE FROM boards WHERE `boards`.`id_board`=' . $indexBind;
+        $expected ='DELETE FROM `boards` WHERE `boards`.`id_board`=' . $indexBind;
 
         $this->assertEquals($expected, $builder->getSQL());
     }
@@ -660,7 +660,7 @@ class RepositoryTest extends TestCase
 
         $expected = 'SELECT `posts`.`id_post`, `posts`.`id_board_fk`, `posts`.`id_user_fk`, `posts`.`id_editor_fk`, ' .
             '`posts`.`title`, `posts`.`text`, `posts`.`created_at`, `posts`.`updated_at`, `posts`.`deleted_at` '.
-            'FROM posts INNER JOIN comments comments1 ON `posts`.`id_post`=`comments1`.`id_post_fk` ' .
+            'FROM `posts` INNER JOIN comments comments1 ON `posts`.`id_post`=`comments1`.`id_post_fk` ' .
             "WHERE `comments1`.`id_comment`=$indexBind";
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -685,7 +685,7 @@ class RepositoryTest extends TestCase
 
         $expected = 'SELECT `comments`.`id_comment`, `comments`.`id_post_fk`, `comments`.`id_user_fk`, ' .
             '`comments`.`text`, `comments`.`created_at`, `comments`.`updated_at`, `comments`.`deleted_at` '.
-            'FROM comments ' .
+            'FROM `comments` ' .
             "WHERE `comments`.`id_post_fk`=$indexBind";
 
         $this->assertEquals($expected, $builder->getSQL());
@@ -710,7 +710,7 @@ class RepositoryTest extends TestCase
 
         $expected =
             'SELECT `emotions`.`id_emotion`, `emotions`.`name`, `emotions`.`created_at`, `emotions`.`updated_at` ' .
-            'FROM emotions ' .
+            'FROM `emotions` ' .
             'INNER JOIN comments_emotions comments_emotions1 ' .
             'ON `emotions`.`id_emotion`=`comments_emotions1`.`id_emotion_fk` ' .
             "WHERE `comments_emotions1`.`id_comment_fk`=$indexBind";
@@ -751,6 +751,18 @@ class RepositoryTest extends TestCase
 
         $this->assertNotEmpty($emotions = $builder->setParameter($indexBind, 2)->execute()->fetchAll());
         $this->assertCount(2, $emotions);
+    }
+
+    /**
+     * Test builder.
+     */
+    public function testCount()
+    {
+        $this->assertNotNull($builder = $this->repository->count(Board::class));
+
+        $expected = 'SELECT COUNT(*) FROM `boards`';
+
+        $this->assertEquals($expected, $builder->getSQL());
     }
 
     /**

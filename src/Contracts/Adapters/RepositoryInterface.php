@@ -128,6 +128,13 @@ interface RepositoryInterface
     public function createRelationshipBuilder($modelClass, $relationshipName);
 
     /**
+     * @param string $modelClass
+     *
+     * @return QueryBuilder
+     */
+    public function count($modelClass);
+
+    /**
      * @return Connection
      */
     public function getConnection();
